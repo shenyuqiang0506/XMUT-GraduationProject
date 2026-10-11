@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "vue-tsc --noEmit && tsc --noEmit -p tests/tsconfig.json && vite build",
     "test": "playwright test"
   },
   "dependencies": {

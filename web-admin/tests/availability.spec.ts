@@ -1,5 +1,6 @@
 import {test,expect,type Page} from '@playwright/test'
 
+// Playwright 在 Node.js 中执行；独立测试配置提供 process.env 与 Buffer 类型。
 test.use({timezoneId:'Asia/Shanghai'})
 test.skip(!process.env.TEST_AVAILABILITY_START,'由 availability-smoke.py 创建独立真实数据后执行')
 // 浏览器测试结束后退出各自会话，不留下管理员登录状态。

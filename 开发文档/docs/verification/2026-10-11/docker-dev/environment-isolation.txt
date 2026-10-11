@@ -1,0 +1,2 @@
+PASS: dev/prod project names, networks, volumes, ports and credentials are independent.
+PASS: images pinned; host ports loopback-only; private files mode 600 and Git-ignored.

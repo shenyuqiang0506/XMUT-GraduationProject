@@ -2,7 +2,7 @@
 
 校园活动与资源智能预约平台毕业设计：计划提供场地与设备联合预约、审批、候补、通知及 AI 查询，覆盖 Web 管理端和 iOS/Android 学生端。
 
-目前是后端依赖准备阶段，业务 API 和前端尚未实现。完整设计见 [开发文档](开发文档/开发文档.md)。
+目前已完成后端依赖准备并部署本机 dev 基础服务，业务 API 和前端尚未实现。完整设计见 [开发文档](开发文档/开发文档.md)。
 
 ## 工程结构
 
@@ -10,6 +10,7 @@
 - `gateway/`：独立 Spring Cloud Gateway WebFlux 工程，不引入 MVC/JDBC；目前没有业务路由。
 - `pom.xml`：聚合两个模块，统一执行验证。
 - `开发文档/`：需求、架构、数据库、接口与验收设计。
+- `deployment/`：dev/prod 独立 Docker 配置、凭据生成与真实服务验证脚本。
 
 ## 构建与验证
 
@@ -25,11 +26,11 @@
 ./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp dependency:tree
 ```
 
-测试配置仅用于本地依赖冒烟：H2 验证 Spring 数据源装配，关闭 Nacos、模型调用及外部健康探测。H2 不能证明 MySQL 的事务和锁行为。真实服务集成、网关转发、Feign 调用和模型工具调用需后续单独验收。
+测试配置仅用于本地依赖冒烟：H2 验证 Spring 数据源装配，关闭 Nacos、模型调用及外部健康探测。H2 不能证明 MySQL 的事务和锁行为。真实基础服务验证使用 `deployment/scripts/verify-dev.sh`；网关转发、Feign 调用和模型工具调用仍需后续验收。
 
 ## 运行配置
 
-参考 [.env.example](.env.example)，在终端或 IDE 运行配置中设置环境变量。Spring Boot 不会自动读取 `.env`；不要提交真实密码、模型密钥和证书。
+已部署的本机 dev 优先使用 [Docker 部署说明](deployment/README.md) 和 `deployment/secrets/dev/backend.env`。手工接入其他服务时可参考 [.env.example](.env.example)，在终端或 IDE 运行配置中设置环境变量。Spring Boot 不会自动读取 `.env`；不要提交真实密码、模型密钥和证书。
 
 业务工程需要准备 MySQL 数据库及 `DB_USERNAME`、`DB_PASSWORD`，并设置 RabbitMQ 凭据；Redis/RabbitMQ 默认使用本机端口。数据库迁移、用户体系和业务表尚未实现。
 
@@ -49,4 +50,4 @@
 
 ## 验证记录
 
-具体版本、执行结果和未覆盖项见 [依赖验证记录](开发文档/docs/development/09-依赖验证记录.md)。Web、uni-app、Docker Compose 和业务服务拆分仍按原开发文档推进，本次不代表 M1 整体完成。
+具体版本、执行结果和未覆盖项见 [依赖验证记录](开发文档/docs/development/09-依赖验证记录.md)。Docker dev 已部署，prod 仅准备配置，详见 [部署说明](deployment/README.md)。Web、uni-app 和业务服务拆分仍按原开发文档推进，本次不代表 M1 整体完成。

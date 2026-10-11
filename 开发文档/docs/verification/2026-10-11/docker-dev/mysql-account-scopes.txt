@@ -1,0 +1,4 @@
+identity_dev: own database login passed; other databases denied
+booking_dev: own database login passed; other databases denied
+ai_dev: own database login passed; other databases denied
+notification_dev: own database login passed; other databases denied

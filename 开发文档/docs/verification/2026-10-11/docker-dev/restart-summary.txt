@@ -1,0 +1,5 @@
+ Container xmut-dev-mysql-1 Healthy
+ Container xmut-dev-rabbitmq-1 Healthy
+ Container xmut-dev-redis-1 Healthy
+ Container xmut-dev-nacos-1 Healthy
+dev: Nacos admin login and environment config verified; credentials not printed.

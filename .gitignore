@@ -33,3 +33,6 @@ secrets/
 uploads/
 backups/
 **/data/
+# Deployment helpers
+__pycache__/
+*.pyc

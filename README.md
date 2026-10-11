@@ -30,6 +30,20 @@
 
 公共模块修改后，单模块工程需重新执行该命令；完整工程导入可直接使用模块源码。
 
+本机 dev 的后端总启动配置为 **后端总启动（dev）**，同时运行身份服务（8083）、预约服务（8082）与网关（8081）。在私密环境文件已准备、Docker dev 已启动后，先在仓库根目录执行一次：
+
+```sh
+python3 deployment/scripts/prepare-idea.py
+```
+
+随后在 IDEA 右上角选“后端总启动（dev）”并运行，也可单独选“身份服务（dev）”“预约服务（dev）”“网关（dev）”。共享配置在 `.run/`，VM 参数加载各服务专属的 `deployment/secrets/dev/idea/*.properties`，启用 `dev,business`；密码与私钥不写入共享 XML。旧的无配置 Application 启动项不会自动读取 `.env`，可能出现 `${DB_USERNAME}` 未解析。
+
+凭据变更后重新执行准备脚本；已有内层 IDEA 工程会生成对应的本机运行配置。总启动包含三个后端服务，Web 仍在 `web-admin` 执行 `npm run dev`。停止时需停止三项后端进程，Docker 独立运行。
+
+已执行的 Flyway `V*.sql` 必须保持原始内容，包括排版；表结构变更应新增版本迁移。否则格式化也可能导致启动时 checksum mismatch。
+
+本机验证已覆盖配置文件独立加载和 IDEA 总启动三服务就绪，见 [IDEA 启动验证记录](开发文档/docs/verification/2026-10-11/m2/idea-startup.json)。
+
 ## 构建与验证
 
 需要 JDK 21 和网络连接。Maven Wrapper 自动下载 Maven 3.10.0，无需全局安装 Maven。在仓库根目录执行：

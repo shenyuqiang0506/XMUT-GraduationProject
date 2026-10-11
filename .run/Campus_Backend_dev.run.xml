@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="后端总启动（dev）" type="CompoundRunConfigurationType">
+    <toRun name="身份服务（dev）" type="SpringBootApplicationConfigurationType" />
+    <toRun name="预约服务（dev）" type="SpringBootApplicationConfigurationType" />
+    <toRun name="网关（dev）" type="SpringBootApplicationConfigurationType" />
+    <method v="2" />
+  </configuration>
+</component>

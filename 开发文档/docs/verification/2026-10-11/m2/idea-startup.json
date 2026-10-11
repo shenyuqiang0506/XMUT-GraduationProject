@@ -1,0 +1,20 @@
+{
+  "environment": "dev",
+  "date": "2026-10-11",
+  "checks": {
+    "maven_reactor_verify": "PASS (5 tests)",
+    "private_properties_without_inherited_service_env": "PASS",
+    "identity_booking_gateway_readiness": "PASS",
+    "gateway_unauthenticated_request": "PASS (401 UNAUTHORIZED)",
+    "idea_compound_configuration_recognized": "PASS",
+    "idea_compound_source_classpath_launch": "PASS (all three readiness endpoints HTTP 200)",
+    "application_ports_released": "PASS (8081-8084,5173)"
+  },
+  "migration": {
+    "file": "V1__resource_catalog_and_imports.sql",
+    "original_checksum": 7303582,
+    "action": "Restored applied migration after whitespace-only formatting; no database repair or deletion."
+  },
+  "prod": "not started",
+  "private_logs": "deployment/secrets/dev/idea-verification/"
+}

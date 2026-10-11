@@ -148,6 +148,12 @@ python3 deployment/scripts/run-service.py dev gateway
 
 推荐根目录运行 `python3 deployment/scripts/dev-workspace.py start` 启动三个服务与 Web。它记录 PID、启动时间与所属进程组；`stop` 只停止本脚本创建且身份匹配的进程及同组子进程。端口占用时不接管其他进程，日志与记录保存在 `secrets/dev/`。
 
+IDEA 调试可先在仓库根目录执行 `python3 deployment/scripts/prepare-idea.py`，然后选 **后端总启动（dev）**。它同时启动 identity、booking、gateway，分服务配置也可独立运行。准备脚本从现有 dev 私密文件生成 `secrets/dev/idea/*.properties`，权限 600；身份签名私钥和初始化管理员凭据只进入身份服务配置。Spring 通过 VM 参数 `spring.config.additional-location` 加载文件；新电脑需先完成上面的基础环境和 `init-auth.py dev`，轮换凭据后需重新生成。共享 `.run` XML 不含密码；当前内层 IDEA 工程的适配 XML 保存在被忽略的 `.idea/runConfigurations/`。此配置仅用于 dev。
+
+可在根目录 Maven `verify` 后运行 `python3 deployment/scripts/verify-idea.py` 验证：清除继承的服务环境变量，以同样的私密 properties 启动三个 JAR，检查 readiness 与网关未认证拒绝。8081–8083 已占用时退出，不接管现有进程；结束后关闭本次启动的进程。日志保存在私密 `secrets/dev/idea-verification/`。不要同时使用 IDEA 和命令行启动器占用同一组端口。
+
+Flyway 已执行的版本迁移保持原始内容，后续结构变更新增迁移。不要对历史 `V*.sql` 自动格式化，也不要关闭迁移校验来绕过 checksum mismatch。
+
 Web 安装/构建在 `web-admin` 执行 `npm ci && npm run build`。本次运行环境 Node 26.10.0、npm 11.19.1；直接依赖固定版本，`package-lock.json` 锁定传递依赖。TypeScript 固定 5.9.3，当前 vue-tsc 3.3.13 与 TypeScript 7 不兼容。Node 版本需满足 Vite 的 `engines`。
 
 导入原文件保存在 `secrets/<环境>/imports/`，目录 700、文件 600。客户端只提交文件与映射，不提供服务器路径。最多 2 MB、2,000 行，仅支持目录；预览保存 SHA-256，确认重新读取并核验。错误整批阻断，事务失败不部分写入。重复导入按来源系统、来源 ID、REAL/DEMO 更新，不删除缺失记录，不产生完整覆盖证明。本机路径在多实例上线前需替换为受控共享持久存储。

@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="网关（dev）" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="gateway" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="org.shen.gateway.GatewayApplication" />
+    <option name="VM_PARAMETERS" value="-Dspring.config.additional-location=&quot;file:$PROJECT_DIR$/deployment/secrets/dev/idea/gateway.properties&quot;" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

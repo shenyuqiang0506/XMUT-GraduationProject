@@ -39,25 +39,26 @@ def main():
         request('POST', '/v3/auth/user/admin', {'password': values['NACOS_PASSWORD']})
         login = request('POST', '/v3/auth/user/login', login_fields)
     token = login['accessToken']
-    fields = {'dataId': 'GraduationProject.properties', 'groupName': 'DEFAULT_GROUP', 'namespaceId': 'public'}
-    expected = f'platform.environment={env}\n'
-    try:
-        current = request('GET', '/v3/admin/cs/config', fields, token)
-    except urllib.error.HTTPError as error:
-        if error.code != 404:
-            raise
-        current = None
-    except RuntimeError as error:
-        if 'code=30004' not in str(error):
-            raise
-        current = None
-    if current is None:
-        request('POST', '/v3/admin/cs/config', dict(fields, content=expected, type='properties'), token)
-    elif f'platform.environment={env}' not in current.get('content', '').splitlines():
-        raise SystemExit('Existing configuration has a different/missing environment marker; not overwritten.')
-    actual = request('GET', '/v3/admin/cs/config', fields, token)
-    if f'platform.environment={env}' not in actual['content'].splitlines():
-        raise SystemExit('Nacos config verification failed')
+    for data_id in ['GraduationProject.properties', 'booking-service.properties', 'identity-service.properties', 'ai-service.properties', 'gateway.properties']:
+        fields = {'dataId': data_id, 'groupName': 'DEFAULT_GROUP', 'namespaceId': 'public'}
+        expected = f'platform.environment={env}\n'
+        try:
+            current = request('GET', '/v3/admin/cs/config', fields, token)
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise
+            current = None
+        except RuntimeError as error:
+            if 'code=30004' not in str(error):
+                raise
+            current = None
+        if current is None:
+            request('POST', '/v3/admin/cs/config', dict(fields, content=expected, type='properties'), token)
+        elif f'platform.environment={env}' not in current.get('content', '').splitlines():
+            raise SystemExit('Existing configuration has a different/missing environment marker; not overwritten.')
+        actual = request('GET', '/v3/admin/cs/config', fields, token)
+        if f'platform.environment={env}' not in actual['content'].splitlines():
+            raise SystemExit('Nacos config verification failed')
     print(f'{env}: Nacos admin login and environment config verified; credentials not printed.')
 
 if __name__ == '__main__':

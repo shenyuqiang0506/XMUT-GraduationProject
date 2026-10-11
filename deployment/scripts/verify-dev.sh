@@ -6,4 +6,4 @@ set -a
 . ./deployment/secrets/dev/backend.env
 set +a
 export XMUT_INFRA_TEST=true
-exec ./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp -pl GraduationProject -Dtest=InfrastructureIT test
+exec ./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp -pl GraduationProject -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=InfrastructureIT test

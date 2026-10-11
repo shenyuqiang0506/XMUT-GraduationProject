@@ -78,6 +78,6 @@ class InfrastructureIT {
     void nacosImportsConfigAndRegistersService() {
         assertThat(environment.getProperty("platform.environment")).isEqualTo("dev");
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-                assertThat(discovery.getInstances("GraduationProject")).isNotEmpty());
+                assertThat(discovery.getInstances("booking-service")).isNotEmpty());
     }
 }

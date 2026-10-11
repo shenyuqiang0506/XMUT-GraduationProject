@@ -32,3 +32,25 @@ ports = lambda env: {p['published'] for s in configs[env]['services'].values() f
 assert ports('dev').isdisjoint(ports('prod')), 'Overlapping ports'
 print('PASS: dev/prod project names, networks, volumes, ports and credentials are independent.')
 print('PASS: images pinned; host ports loopback-only; private files mode 600 and Git-ignored.')
+
+# Business JWT/session credentials are also independent and never committed.
+import importlib.util
+spec=importlib.util.spec_from_file_location('runtime',ROOT/'scripts/run-service.py')
+runtime=importlib.util.module_from_spec(spec);spec.loader.exec_module(runtime)
+auth={}
+for env in ['dev','prod']:
+    private=ROOT/'secrets'/env
+    auth[env]=runtime.load_env(private/'auth.env')
+    for name in ['auth.env','identity.env','jwt-private.pem','jwt-public.pem']:
+        path=private/name
+        assert stat.S_IMODE(path.stat().st_mode)==0o600
+        subprocess.run(['git','check-ignore','--quiet',str(path)],cwd=ROOT,check=True)
+    assert auth[env]['JWT_ISSUER']=='urn:xmut:'+env+':identity'
+    assert auth[env]['JWT_AUDIENCE']=='xmut-'+env+'-api'
+    assert Path(auth[env]['IMPORT_STORAGE_DIR']).parent==private
+    for service in ['booking-service','gateway','ai-service']:
+        child=runtime.service_env(env,service)
+        assert 'JWT_PRIVATE_KEY_PATH' not in child and 'AUTH_ADMIN_PASSWORD' not in child and 'IDENTITY_DB_PASSWORD' not in child
+assert auth['dev']['JWT_PUBLIC_KEY_PATH']!=auth['prod']['JWT_PUBLIC_KEY_PATH']
+assert (ROOT/'secrets/dev/jwt-public.pem').read_bytes()!=(ROOT/'secrets/prod/jwt-public.pem').read_bytes()
+print('PASS: independent dev/prod JWT keys, issuer, audience and import directories; private signing key stays in identity service.')

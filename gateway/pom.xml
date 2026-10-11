@@ -9,6 +9,7 @@
     </parent>
     <artifactId>gateway</artifactId>
     <dependencies>
+        <dependency><groupId>org.shen</groupId><artifactId>security-core</artifactId><version>${project.version}</version></dependency>
         <dependency>
             <groupId>org.shen</groupId>
             <artifactId>common-contracts</artifactId>

@@ -8,7 +8,6 @@ import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-import org.springframework.core.Ordered;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpStatus;
@@ -18,7 +17,6 @@ import org.springframework.security.core.userdetails.MapReactiveUserDetailsServi
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
@@ -50,20 +48,6 @@ class M1GatewayConfiguration {
                             exchange.getResponse().getHeaders().getFirst(TraceIds.HEADER)));
                     return exchange.getResponse().writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(body)));
                 })).build();
-    }
-    @Bean
-    WebFilter traceFilter() {
-        return new TraceWebFilter();
-    }
-    static final class TraceWebFilter implements WebFilter, Ordered {
-        public int getOrder() { return Ordered.HIGHEST_PRECEDENCE; }
-        public Mono<Void> filter(org.springframework.web.server.ServerWebExchange exchange,
-                org.springframework.web.server.WebFilterChain chain) {
-            String trace = TraceIds.acceptOrCreate(exchange.getRequest().getHeaders().getFirst(TraceIds.HEADER));
-            exchange.getResponse().getHeaders().set(TraceIds.HEADER, trace);
-            var request = exchange.getRequest().mutate().headers(headers -> headers.set(TraceIds.HEADER, trace)).build();
-            return chain.filter(exchange.mutate().request(request).build());
-        }
     }
     @Bean
     RouteLocator m1Routes(RouteLocatorBuilder builder) {

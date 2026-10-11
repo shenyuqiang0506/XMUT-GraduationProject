@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-11",
+  "browser": "Playwright isolated Chromium",
+  "passed": 3,
+  "failed": 0,
+  "skipped": 0,
+  "checks": [
+    "Administrator login, in-memory session, single refresh for concurrent 401 responses, resource create/edit, account create, valid/invalid import and logout",
+    "Student route and catalog visibility",
+    "Resource administrator route and group-scoped catalog"
+  ],
+  "durationMs": 7111,
+  "scope": "Real dev APIs through Vite proxy; iOS/Android deferred"
+}

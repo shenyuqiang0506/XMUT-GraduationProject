@@ -36,3 +36,7 @@ backups/
 # Deployment helpers
 __pycache__/
 *.pyc
+
+# Browser verification artifacts may contain session data
+**/test-results/
+**/playwright-report/

@@ -54,7 +54,9 @@ python3 deployment/scripts/prepare-idea.py
 
 `.mvn/settings.xml` 统一到 Maven Central，避免第三方 POM 附带的私有仓库导致认证失败。依赖使用正式发布版，完整解析树可运行 `dependency:tree` 查看。
 
-普通 `verify` 执行原有 5 项基础测试；H2 只能验证装配，不能证明 MySQL 事务与锁行为。真实基础服务验证使用 `deployment/scripts/verify-dev.sh`；正式身份、目录与 Web 使用下面的验收脚本。详细操作见 [部署说明](deployment/README.md)。
+七个 Java 模块统一引入 Lombok（由 Boot 管理，当前 1.18.46）和 Hutool 全量包（5.8.47）。Lombok 使用 `provided` 范围并配置注解处理器，排除出可执行 JAR；Hutool 可直接使用 `cn.hutool.*`。IDEA 同步 Maven 后会导入依赖与处理器配置。现有业务代码保持原有实现，后续按需使用。
+
+普通 `verify` 执行 6 项基础测试，包含 Lombok 生成构造器/getter 与 Hutool 调用验证；H2 只能验证装配，不能证明 MySQL 事务与锁行为。真实基础服务验证使用 `deployment/scripts/verify-dev.sh`；正式身份、目录与 Web 使用下面的验收脚本。详细操作见 [部署说明](deployment/README.md)。
 
 ## M2 本机运行
 

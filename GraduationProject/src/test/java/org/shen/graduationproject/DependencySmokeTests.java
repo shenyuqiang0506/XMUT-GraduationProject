@@ -5,6 +5,9 @@ import java.io.ByteArrayOutputStream;
 
 import jakarta.validation.Validation;
 import jakarta.validation.constraints.Min;
+import cn.hutool.core.util.StrUtil;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -13,6 +16,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class DependencySmokeTests {
     record Request(@Min(1) int participants) {}
+
+    @Getter
+    @RequiredArgsConstructor
+    static class UtilityDependencyProbe {
+        private final String name;
+    }
+
+    @Test
+    void lombokGeneratedMembersAndHutoolAreAvailable() {
+        var probe = new UtilityDependencyProbe("校园资源预约");
+        assertThat(probe.getName()).isEqualTo("校园资源预约");
+        assertThat(StrUtil.isBlank(probe.getName())).isFalse();
+        assertThat(StrUtil.isBlank(" \t\n")).isTrue();
+    }
 
     @Test
     void excelWorkbookRoundTrips() throws Exception {

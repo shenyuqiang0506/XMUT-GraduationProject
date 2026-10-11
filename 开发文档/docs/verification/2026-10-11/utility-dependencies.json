@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-11",
+  "java": 21,
+  "dependencies": {
+    "org.projectlombok:lombok": {
+      "version": "1.18.46",
+      "scope": "provided",
+      "version_source": "Spring Boot 4.0.8"
+    },
+    "cn.hutool:hutool-all": {
+      "version": "5.8.47",
+      "scope": "compile"
+    }
+  },
+  "checks": {
+    "clean_verify": "PASS",
+    "tests": {
+      "total": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lombok_annotation_processing_and_generated_members": "PASS",
+    "hutool_StrUtil_execution": "PASS",
+    "root_and_seven_modules_dependency_resolution": "PASS",
+    "four_executable_jars_hutool_included_lombok_excluded": "PASS",
+    "idea_class_resolution_after_maven_reload": "PASS"
+  },
+  "osv_query": {
+    "date": "2026-10-11",
+    "queried_only_new_direct_dependencies": true,
+    "matching_advisories": []
+  }
+}

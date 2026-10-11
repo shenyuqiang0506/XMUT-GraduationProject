@@ -1,6 +1,7 @@
 package org.shen.ai.m1;
 
 import java.util.Map;
+
 import org.shen.platform.contracts.ApiResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.context.annotation.Profile;

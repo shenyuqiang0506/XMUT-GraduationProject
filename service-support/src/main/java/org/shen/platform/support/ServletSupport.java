@@ -1,6 +1,7 @@
 package org.shen.platform.support;
 
 import java.io.IOException;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,7 +23,7 @@ public class ServletSupport {
         var filter = new OncePerRequestFilter() {
             @Override
             protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-                    FilterChain chain) throws ServletException, IOException {
+                                            FilterChain chain) throws ServletException, IOException {
                 String trace = TraceIds.acceptOrCreate(request.getHeader(TraceIds.HEADER));
                 MDC.put(TraceIds.MDC_KEY, trace);
                 response.setHeader(TraceIds.HEADER, trace);

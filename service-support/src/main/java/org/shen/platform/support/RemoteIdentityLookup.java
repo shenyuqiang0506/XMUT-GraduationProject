@@ -2,6 +2,7 @@ package org.shen.platform.support;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+
 import org.shen.platform.contracts.*;
 import org.slf4j.MDC;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
@@ -14,29 +15,33 @@ import org.springframework.web.client.RestClientResponseException;
 public final class RemoteIdentityLookup implements IdentityLookup {
     private final DiscoveryClient discovery;
     private final RestClient http;
+
     public RemoteIdentityLookup(DiscoveryClient discovery) {
-        this.discovery=discovery;
-        var factory=new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
+        this.discovery = discovery;
+        var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
         factory.setReadTimeout(Duration.ofSeconds(3));
-        this.http=RestClient.builder().requestFactory(factory).build();
+        this.http = RestClient.builder().requestFactory(factory).build();
     }
+
     public AuthActor resolve(Jwt jwt) {
-        var instances=discovery.getInstances("identity-service");
-        if(instances.isEmpty()) throw new BusinessException(503,"SERVICE_UNAVAILABLE","身份服务暂不可用");
+        var instances = discovery.getInstances("identity-service");
+        if (instances.isEmpty()) throw new BusinessException(503, "SERVICE_UNAVAILABLE", "身份服务暂不可用");
         try {
-            var response=http.get().uri(instances.getFirst().getUri()+"/internal/auth/session")
-                    .header("Authorization","Bearer "+jwt.getTokenValue())
-                    .header(TraceIds.HEADER,TraceIds.acceptOrCreate(MDC.get(TraceIds.MDC_KEY)))
-                    .retrieve().body(new ParameterizedTypeReference<ApiResponse<AuthActor>>() {});
-            if(response==null || !"OK".equals(response.code()) || response.data()==null
+            var response = http.get().uri(instances.getFirst().getUri() + "/internal/auth/session")
+                    .header("Authorization", "Bearer " + jwt.getTokenValue())
+                    .header(TraceIds.HEADER, TraceIds.acceptOrCreate(MDC.get(TraceIds.MDC_KEY)))
+                    .retrieve().body(new ParameterizedTypeReference<ApiResponse<AuthActor>>() {
+                    });
+            if (response == null || !"OK".equals(response.code()) || response.data() == null
                     || !jwt.getSubject().equals(response.data().userId())
                     || !jwt.getClaimAsString("sid").equals(response.data().sessionId())) {
-                throw new BusinessException(503,"SERVICE_UNAVAILABLE","身份服务响应无效");
+                throw new BusinessException(503, "SERVICE_UNAVAILABLE", "身份服务响应无效");
             }
             return response.data();
-        } catch(RestClientResponseException failure) {
-            if(failure.getStatusCode().value()==401) throw new BusinessException(401,"SESSION_REVOKED","登录状态已失效");
-            throw new BusinessException(503,"SERVICE_UNAVAILABLE","身份校验暂不可用");
+        } catch (RestClientResponseException failure) {
+            if (failure.getStatusCode().value() == 401)
+                throw new BusinessException(401, "SESSION_REVOKED", "登录状态已失效");
+            throw new BusinessException(503, "SERVICE_UNAVAILABLE", "身份校验暂不可用");
         }
     }
 }

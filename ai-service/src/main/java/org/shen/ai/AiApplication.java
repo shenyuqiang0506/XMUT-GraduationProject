@@ -10,5 +10,7 @@ import org.springframework.context.annotation.Import;
 @EnableFeignClients
 @Import(ServletSupport.class)
 public class AiApplication {
-    public static void main(String[] args) { SpringApplication.run(AiApplication.class, args); }
+    public static void main(String[] args) {
+        SpringApplication.run(AiApplication.class, args);
+    }
 }

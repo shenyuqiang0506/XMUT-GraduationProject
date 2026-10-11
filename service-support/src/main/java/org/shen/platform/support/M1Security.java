@@ -2,6 +2,7 @@ package org.shen.platform.support;
 
 import java.util.Base64;
 import java.nio.charset.StandardCharsets;
+
 import feign.RequestInterceptor;
 import org.shen.platform.contracts.ApiResponse;
 import org.shen.platform.contracts.TraceIds;
@@ -25,8 +26,8 @@ import tools.jackson.databind.ObjectMapper;
 public class M1Security {
     @Bean
     UserDetailsService smokeUser(Environment environment,
-            @Value("${M1_SMOKE_USERNAME}") String username,
-            @Value("${M1_SMOKE_PASSWORD}") String password) {
+                                 @Value("${M1_SMOKE_USERNAME}") String username,
+                                 @Value("${M1_SMOKE_PASSWORD}") String password) {
         if (!environment.acceptsProfiles(Profiles.of("dev", "test"))
                 || environment.acceptsProfiles(Profiles.of("prod")) || password.length() < 24) {
             throw new IllegalStateException("M1 probes require dev/test and explicit credentials");
@@ -34,6 +35,7 @@ public class M1Security {
         return new InMemoryUserDetailsManager(User.withUsername(username)
                 .password("{bcrypt}" + new BCryptPasswordEncoder().encode(password)).roles("M1_PROBE").build());
     }
+
     @Bean
     SecurityFilterChain smokeSecurity(HttpSecurity http, ObjectMapper json) throws Exception {
         return http.csrf(csrf -> csrf.disable())
@@ -50,9 +52,10 @@ public class M1Security {
                         org.springframework.security.config.http.SessionCreationPolicy.STATELESS))
                 .build();
     }
+
     @Bean
     RequestInterceptor m1FeignHeaders(@Value("${M1_SMOKE_USERNAME}") String username,
-            @Value("${M1_SMOKE_PASSWORD}") String password) {
+                                      @Value("${M1_SMOKE_PASSWORD}") String password) {
         String auth = "Basic " + Base64.getEncoder().encodeToString(
                 (username + ":" + password).getBytes(StandardCharsets.UTF_8));
         return request -> {

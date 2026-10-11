@@ -1,6 +1,7 @@
 package org.shen.ai.m1;
 
 import java.util.Map;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -17,18 +18,25 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Profile("m1 & ai")
 class M1AiController {
-    record Query(@NotBlank @Size(max = 512) String text) {}
+    record Query(@NotBlank @Size(max = 512) String text) {
+    }
+
     private final ChatClient chat;
     private final BookingClient booking;
-    M1AiController(ChatClient chat, BookingClient booking) { this.chat = chat; this.booking = booking; }
+
+    M1AiController(ChatClient chat, BookingClient booking) {
+        this.chat = chat;
+        this.booking = booking;
+    }
+
     @PostMapping("/internal/m1/query")
     ResponseEntity<?> query(@Valid @RequestBody Query query) {
         var tool = new ReadOnlyResourceTool(booking);
         try {
             var result = chat.prompt().system("This is a technical DEMO, not a real reservation. "
-                    + "Call getResourceDetails for demo-venue-1 exactly once before answering. "
-                    + "Use its returned data only. UNKNOWN must remain UNKNOWN. "
-                    + "Do not create bookings or claim success. Reply briefly in Chinese.")
+                            + "Call getResourceDetails for demo-venue-1 exactly once before answering. "
+                            + "Use its returned data only. UNKNOWN must remain UNKNOWN. "
+                            + "Do not create bookings or claim success. Reply briefly in Chinese.")
                     .user(query.text()).tools(tool).call().chatResponse();
             if (result == null || result.getResult() == null
                     || !"stop".equalsIgnoreCase(result.getResult().getMetadata().getFinishReason())

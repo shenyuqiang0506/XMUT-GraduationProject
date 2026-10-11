@@ -1,6 +1,7 @@
 package org.shen.identity.controller;
 
 import java.util.Map;
+
 import jakarta.validation.Valid;
 import org.shen.identity.application.AuthenticationService;
 import org.shen.identity.domain.AuthCommands;
@@ -18,17 +19,40 @@ import org.springframework.web.bind.annotation.*;
 class AuthController {
     private final AuthenticationService authentication;
     private final LoginThrottle throttle;
-    AuthController(AuthenticationService authentication,LoginThrottle throttle) { this.authentication=authentication;this.throttle=throttle; }
+
+    AuthController(AuthenticationService authentication, LoginThrottle throttle) {
+        this.authentication = authentication;
+        this.throttle = throttle;
+    }
+
     private ResponseEntity<?> response(Object data) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success(data,MDC.get(TraceIds.MDC_KEY)));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success(data, MDC.get(TraceIds.MDC_KEY)));
     }
-    @PostMapping("/auth/login") ResponseEntity<?> login(@Valid @RequestBody AuthCommands.Login request,jakarta.servlet.http.HttpServletRequest http) {
-        throttle.check(request.username(),http.getRemoteAddr());return response(authentication.login(request));
+
+    @PostMapping("/auth/login")
+    ResponseEntity<?> login(@Valid @RequestBody AuthCommands.Login request, jakarta.servlet.http.HttpServletRequest http) {
+        throttle.check(request.username(), http.getRemoteAddr());
+        return response(authentication.login(request));
     }
-    @PostMapping("/auth/refresh") ResponseEntity<?> refresh(@Valid @RequestBody AuthCommands.Refresh request) { return response(authentication.refresh(request)); }
-    @PostMapping("/auth/logout") ResponseEntity<?> logout(@AuthenticationPrincipal AuthActor actor) {
-        authentication.logout(actor);return response(Map.of("loggedOut",true));
+
+    @PostMapping("/auth/refresh")
+    ResponseEntity<?> refresh(@Valid @RequestBody AuthCommands.Refresh request) {
+        return response(authentication.refresh(request));
     }
-    @GetMapping("/users/me") ResponseEntity<?> me(@AuthenticationPrincipal AuthActor actor) { return response(actor); }
-    @GetMapping("/internal/auth/session") ResponseEntity<?> session(@AuthenticationPrincipal AuthActor actor) { return response(actor); }
+
+    @PostMapping("/auth/logout")
+    ResponseEntity<?> logout(@AuthenticationPrincipal AuthActor actor) {
+        authentication.logout(actor);
+        return response(Map.of("loggedOut", true));
+    }
+
+    @GetMapping("/users/me")
+    ResponseEntity<?> me(@AuthenticationPrincipal AuthActor actor) {
+        return response(actor);
+    }
+
+    @GetMapping("/internal/auth/session")
+    ResponseEntity<?> session(@AuthenticationPrincipal AuthActor actor) {
+        return response(actor);
+    }
 }

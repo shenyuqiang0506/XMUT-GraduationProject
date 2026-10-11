@@ -25,8 +25,8 @@ import tools.jackson.databind.ObjectMapper;
 class M1GatewayConfiguration {
     @Bean
     MapReactiveUserDetailsService smokeUser(Environment environment,
-            @Value("${M1_SMOKE_USERNAME}") String username,
-            @Value("${M1_SMOKE_PASSWORD}") String password) {
+                                            @Value("${M1_SMOKE_USERNAME}") String username,
+                                            @Value("${M1_SMOKE_PASSWORD}") String password) {
         if (!environment.acceptsProfiles(Profiles.of("dev", "test"))
                 || environment.acceptsProfiles(Profiles.of("prod")) || password.length() < 24) {
             throw new IllegalStateException("M1 probes require dev/test and explicit credentials");
@@ -34,6 +34,7 @@ class M1GatewayConfiguration {
         return new MapReactiveUserDetailsService(User.withUsername(username)
                 .password("{bcrypt}" + new BCryptPasswordEncoder().encode(password)).roles("M1_PROBE").build());
     }
+
     @Bean
     SecurityWebFilterChain smokeSecurity(ServerHttpSecurity http, ObjectMapper json) {
         return http.csrf(csrf -> csrf.disable())
@@ -49,6 +50,7 @@ class M1GatewayConfiguration {
                     return exchange.getResponse().writeWith(Mono.just(exchange.getResponse().bufferFactory().wrap(body)));
                 })).build();
     }
+
     @Bean
     RouteLocator m1Routes(RouteLocatorBuilder builder) {
         return builder.routes()

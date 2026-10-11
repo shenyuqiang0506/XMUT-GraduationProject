@@ -19,10 +19,16 @@ import tools.jackson.databind.ObjectMapper;
 class GatewayErrors implements ErrorWebExceptionHandler {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(GatewayErrors.class);
     private final ObjectMapper json;
-    GatewayErrors(ObjectMapper json) { this.json = json; }
+
+    GatewayErrors(ObjectMapper json) {
+        this.json = json;
+    }
+
     public Mono<Void> handle(ServerWebExchange exchange, Throwable failure) {
         LOG.warn("Gateway request failed traceId={} errorType={}", exchange.getResponse().getHeaders().getFirst(TraceIds.HEADER), failure.getClass().getName());
-        if (exchange.getResponse().isCommitted()) { return Mono.error(failure); }
+        if (exchange.getResponse().isCommitted()) {
+            return Mono.error(failure);
+        }
         int status = failure instanceof ResponseStatusException exception
                 ? exception.getStatusCode().value() : 503;
         exchange.getResponse().setStatusCode(HttpStatus.valueOf(status));

@@ -1,0 +1,35 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+# Build outputs and caches
+**/target/
+**/build/
+**/dist/
+node_modules/
+.m2/
+.cache/
+coverage/
+*.log
+logs/
+# Local credentials and runtime data
+.env
+.env.*
+!.env.example
+application-local.*
+application-secrets.*
+*.pem
+*.key
+*.p12
+*.jks
+secrets/
+uploads/
+backups/
+**/data/

@@ -2,25 +2,27 @@
 
 校园活动与资源智能预约平台毕业设计：计划提供场地与设备联合预约、审批、候补、通知及 AI 查询，覆盖 Web 管理端和 iOS/Android 学生端。
 
-目前已建立 M1 后端独立服务、网关路由、Feign 与 AI 只读工具验证工程，本机 dev 基础服务已部署。业务 API 和前端尚未实现。完整设计见 [开发文档](开发文档/开发文档.md)。
+已完成 M1 后端调用链与 M2 身份、资源目录、Excel/JSON 导入、Web 基础管理页，本机 dev 基础服务已部署。联合预约与审批从 M3 开始，移动端按用户要求暂缓。完整设计见 [开发文档](开发文档/开发文档.md)，当前实现范围见 [M2 验收记录](开发文档/docs/development/13-M2身份目录验收.md)。
 
 ## 工程结构
 
-- `GraduationProject/`：booking-service，保留原目录和制品名；MVC、数据库、消息与只读演示资源。
-- `identity-service/`：身份服务骨架，提供开发验证端点。
-- `ai-service/`：Spring AI 模型适配，通过只读工具和 Feign 查询演示资源。
-- `gateway/`：独立 WebFlux 网关，通过 Nacos/LoadBalancer 路由开发验证请求。
-- `common-contracts/`：统一响应与 traceId 契约。
-- `service-support/`：MVC traceId、开发验证认证、Feign 请求头和错误处理。
-- `pom.xml`：统一版本管理并聚合六个模块。
+- `GraduationProject/`：booking-service，保留原目录和制品名；正式资源目录、导入、审批组与管理范围。
+- `identity-service/`：本地账号、BCrypt、JWT/刷新会话、角色与账号启停。
+- `ai-service/`：Spring AI 模型适配，M1 只读工具与 Feign 演示验证；正式 AI 在 M5 实现。
+- `gateway/`：WebFlux 网关、JWT 校验和 Nacos/LoadBalancer 路由。
+- `common-contracts/`：统一响应、身份与 traceId 契约。
+- `security-core/`：共享 RSA 密钥读取与 JWT 校验，不向网关引入 MVC/JDBC。
+- `service-support/`：MVC traceId、实时身份检查、Feign 请求头和错误处理。
+- `web-admin/`：Vue 3 + TypeScript + Element Plus，登录、目录、导入和账号页。
+- `pom.xml`：统一版本管理并聚合七个 Java 模块。
 - `开发文档/`：需求、架构、数据库、接口与验收设计。
-- `deployment/`：dev/prod 独立 Docker 配置、凭据生成与真实服务验证脚本。
+- `deployment/`：dev/prod 独立 Docker 配置、私密凭据生成与真实服务验证。
 
 ## IDEA 导入
 
-在 IDEA 中打开仓库根目录的 `pom.xml`，导入整个 Maven 工程。Maven 面板应包含 common-contracts、service-support、identity-service、booking-service、ai-service 和 gateway。`org.shen.platform` 来自 common-contracts/service-support，单独导入内层 `GraduationProject/pom.xml` 会缺少这些模块。
+在 IDEA 中打开仓库根目录 `pom.xml`，导入整个 Maven 工程。Maven 面板应包含 common-contracts、security-core、service-support、identity-service、booking-service、ai-service 和 gateway。`org.shen.platform` 来自公共模块，单独导入内层 `GraduationProject/pom.xml` 会缺少这些模块。
 
-已有单模块窗口可通过 Maven 面板的“添加 Maven 项目”选择外层 `pom.xml`，然后同步。若需要独立打开 booking 工程，先在仓库根目录把公共模块安装到本机 Maven 仓库，再同步 IDEA：
+已有单模块窗口可通过 Maven 面板的“添加 Maven 项目”选择外层 `pom.xml`，然后同步。若需独立打开 booking 工程，先在仓库根目录安装公共模块，再同步 IDEA：
 
 ```sh
 ./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp -pl service-support -am install -DskipTests
@@ -30,36 +32,69 @@
 
 ## 构建与验证
 
-需要 JDK 21 和网络连接。Maven Wrapper 会自动下载 Maven 3.10.0，无需全局安装 Maven。在仓库根目录执行：
+需要 JDK 21 和网络连接。Maven Wrapper 自动下载 Maven 3.10.0，无需全局安装 Maven。在仓库根目录执行：
 
 ```sh
 ./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp clean verify
 ```
 
-`.mvn/settings.xml` 将依赖仓库统一到 Maven Central，避免第三方 POM 附带的私有仓库导致认证失败。全部版本使用正式发布版；完整解析树可用以下命令生成：
+`.mvn/settings.xml` 统一到 Maven Central，避免第三方 POM 附带的私有仓库导致认证失败。依赖使用正式发布版，完整解析树可运行 `dependency:tree` 查看。
+
+普通 `verify` 执行原有 5 项基础测试；H2 只能验证装配，不能证明 MySQL 事务与锁行为。真实基础服务验证使用 `deployment/scripts/verify-dev.sh`；正式身份、目录与 Web 使用下面的验收脚本。详细操作见 [部署说明](deployment/README.md)。
+
+## M2 本机运行
+
+本机私密文件已生成，正式管理员账号与原始密码在 `deployment/secrets/dev/business-accounts.md`；这与 Nacos、M1 验证账号不同。新电脑先按部署说明生成文件、启动 Docker dev，再执行：
 
 ```sh
-./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp dependency:tree
+# 根目录：构建 Java 七模块。
+./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp verify
+# web-admin 中：安装锁定依赖、检查生产构建。
+cd web-admin
+npm ci
+npm run build
+cd ..
+# 启动 identity、booking、gateway、Web 四个本机进程。
+python3 deployment/scripts/dev-workspace.py start
+# 查看/停止本脚本记录的进程，不影响 Docker。
+python3 deployment/scripts/dev-workspace.py status
+python3 deployment/scripts/dev-workspace.py stop
 ```
 
-测试配置仅用于本地依赖冒烟：H2 验证 Spring 数据源装配，关闭 Nacos、模型调用及外部健康探测。H2 不能证明 MySQL 的事务和锁行为。真实基础服务验证使用 `deployment/scripts/verify-dev.sh`；M1 HTTP 调用链使用 `deployment/scripts/m1-smoke.py` 验证，操作见下方部署说明。
+访问 <http://127.0.0.1:5173>；Vite 将 `/api/v1` 转发给 8081 网关。凭据与导入原文件保存在被忽略的私密目录。启动前检查 8081–8083、5173 空闲；不要在服务运行时重建或覆盖 JAR。启动器用于本机 dev，线上 Web/HTTPS 部署仍待完成。
+
+真实验收（先停止上述启动器，脚本自行启动服务并清理本轮测试资料）：
+
+```sh
+python3 deployment/scripts/auth-smoke.py
+python3 deployment/scripts/catalog-smoke.py
+# 首次浏览器验证：先在 web-admin 执行 npx playwright install chromium。
+XMUT_WEB_TEST=1 python3 deployment/scripts/catalog-smoke.py
+```
+
+目录返回 `UNKNOWN` 不表示可预约；学校占用、完整覆盖、时段搜索、预约事务与审批尚待 M3。
 
 ## 运行配置
 
-已部署的本机 dev 优先使用 [Docker 部署说明](deployment/README.md) 和 `deployment/secrets/dev/backend.env`。手工接入其他服务时可参考 [.env.example](.env.example)，在终端或 IDE 运行配置中设置环境变量。Spring Boot 不会自动读取 `.env`；不要提交真实密码、模型密钥和证书。
+本机 dev 优先使用 [部署说明](deployment/README.md) 和分服务私密环境文件。Spring Boot 不自动读取 `.env`；使用 `run-service.py` 加载对应配置，避免将身份私钥分发给网关或其他服务。
 
-业务工程需要准备 MySQL 数据库及 `DB_USERNAME`、`DB_PASSWORD`，并设置 RabbitMQ 凭据；Redis/RabbitMQ 默认使用本机端口。数据库迁移、用户体系和业务表尚未实现。
-
-各服务打包后可以使用 `java -jar <服务>/target/<制品>.jar` 启动。本机端口为 booking 8082、identity 8083、AI 8084、gateway 8081，默认绑定回环地址。先加载私密环境变量；新增模块依赖根工程，验证使用根目录的 Maven reactor。
+端口：booking 8082、identity 8083、AI 8084、gateway 8081，默认回环地址。M2 Flyway 迁移分别位于身份服务与目录服务，分库账号只访问自己的库。
 
 可选 Spring profiles：
 
-- `dev` / `prod`：启用对应环境标记和 Nacos；配置中心 Data ID 使用各服务的 `spring.application.name`。
-- `m1`：仅允许同时启用 `dev` 或 `test`，加载私密 M1 验证凭据，拒绝 `prod`。使用开发 Basic 认证和 DEMO 数据，不提供 JWT 或业务权限验收。
-- `ai`：仅在 ai-service 启用模型，需要 `AI_BASE_URL`、`AI_MODEL`、`AI_API_KEY`。未启用时不会调用模型；调用可能产生费用。
+- `dev` / `prod`：对应环境标记和 Nacos；Data ID 使用服务的 `spring.application.name`。
+- `business`：正式 M2 API，加载对应环境的 JWT、数据库配置；不要与 `m1` 组合。
+- `bootstrap-admin`：仅 dev/test 身份服务初始化空库管理员，已有账号不覆盖；prod 禁止。
+- `m1`：仅允许 dev/test，开发 Basic 认证与 DEMO 数据；拒绝 prod。
+- `ai`：仅在 ai-service 启用模型，需要私密 AI_BASE_URL、AI_MODEL、AI_API_KEY；调用可能产生费用。
 
-自动验证器使用独立 Nacos 注册 group，临时启动四个 Java 进程并在完成后停止自己创建的进程。Docker dev 基础服务继续运行。具体命令、密钥文件和日志位置见 [部署说明](deployment/README.md)。Actuator 仅暴露 health/info。
+自动验证使用独立 Nacos 注册 group，完成后停止自己创建的 Java 进程，Docker dev 继续运行。Actuator 仅暴露 health/info。prod 已准备独立配置与凭据，尚未部署。
 
 ## 验证记录
 
-具体版本、执行结果和未覆盖项见 [依赖验证记录](开发文档/docs/development/09-依赖验证记录.md)。Docker dev 已部署，prod 仅准备配置，详见 [部署说明](deployment/README.md)。后端调用链结果见 [M1 后端验证记录](开发文档/docs/development/12-M1后端验证记录.md)。iOS/Android 基础运行按用户要求暂缓；业务阶段继续按设计推进，本次不代表整个平台验收完成。
+- [依赖验证记录](开发文档/docs/development/09-依赖验证记录.md)
+- [Docker 环境验证](开发文档/docs/development/10-Docker环境验证记录.md)
+- [M1 验收核对](开发文档/docs/development/11-M1验收核对.md)与[后端调用链](开发文档/docs/development/12-M1后端验证记录.md)
+- [M2 身份、目录与 Web 验收](开发文档/docs/development/13-M2身份目录验收.md)
+
+iOS/Android 基础运行按用户要求暂缓；本次不代表整个平台验收完成。

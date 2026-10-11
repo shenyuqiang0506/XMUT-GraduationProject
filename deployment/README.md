@@ -65,7 +65,7 @@ set +a
 java -jar GraduationProject/target/GraduationProject-0.0.1-SNAPSHOT.jar
 ```
 
-集成测试验证 MySQL/InnoDB 回滚、Redis 读写、RabbitMQ 消息收发、Nacos 配置导入与服务注册。测试只临时创建自己的表、key 和独占队列，结束后清理。业务 Flyway 迁移尚未编写；Flyway 能连接真实数据库不表示业务表已完成。
+集成测试验证 MySQL/InnoDB 回滚、Redis 读写、RabbitMQ 消息收发、Nacos 配置导入与服务注册。测试只临时创建自己的表、key 和独占队列，结束后清理。M2 身份与目录 Flyway 迁移已完成；基础设施测试与正式 API 验收分别执行。
 
 `InfrastructureIT` 默认不执行，需要 `verify-dev.sh` 设置 `XMUT_INFRA_TEST=true`；该脚本固定为 dev，不对 prod 执行业务写入测试。普通 `mvn verify` 继续运行不依赖 Docker 的原有 5 项测试。
 
@@ -126,3 +126,40 @@ python3 deployment/scripts/bootstrap-nacos.py prod
 ## 参考与验证记录
 
 [MySQL 官方初始化规则](https://hub.docker.com/_/mysql)、[Nacos 单机部署](https://nacos.io/en/docs/v3.0/manual/admin/deployment/deployment-standalone/)、[Nacos 3.1 快速开始](https://nacos.io/en/docs/v3.1/quickstart/quick-start/)。执行结果见 [Docker 环境验证记录](../开发文档/docs/development/10-Docker环境验证记录.md)。
+
+## M2 正式身份、目录与 Web
+
+新机器在基础凭据生成后执行以下命令（本机已完成；已有文件拒绝覆盖）：
+
+```sh
+python3 deployment/scripts/init-auth.py dev
+python3 deployment/scripts/init-auth.py prod
+```
+
+每套环境生成 RSA 3072 私钥/公钥、`auth.env`、`identity.env`，权限 600。`auth.env` 保存公钥路径、issuer、audience、key ID 与私密导入目录；身份私钥只在 identity 环境中加载。dev 的 `business-accounts.md` 留存初始化账号与原始密码，数据库只保存 BCrypt。prod 没有 dev 初始化账号，首次管理员需在上线前通过受控配置流程建立；本次未启动 prod。
+
+`run-service.py` 分别加载身份库与目录库凭据，启用 `dev,business`。身份首次启动可使用 `--bootstrap-admin`，只允许 dev，已有账号不重置。手工在三个终端启动：
+
+```sh
+python3 deployment/scripts/run-service.py dev identity-service --bootstrap-admin
+python3 deployment/scripts/run-service.py dev booking-service
+python3 deployment/scripts/run-service.py dev gateway
+```
+
+推荐根目录运行 `python3 deployment/scripts/dev-workspace.py start` 启动三个服务与 Web。它记录 PID、启动时间与所属进程组；`stop` 只停止本脚本创建且身份匹配的进程及同组子进程。端口占用时不接管其他进程，日志与记录保存在 `secrets/dev/`。
+
+Web 安装/构建在 `web-admin` 执行 `npm ci && npm run build`。本次运行环境 Node 26.10.0、npm 11.19.1；直接依赖固定版本，`package-lock.json` 锁定传递依赖。TypeScript 固定 5.9.3，当前 vue-tsc 3.3.13 与 TypeScript 7 不兼容。Node 版本需满足 Vite 的 `engines`。
+
+导入原文件保存在 `secrets/<环境>/imports/`，目录 700、文件 600。客户端只提交文件与映射，不提供服务器路径。最多 2 MB、2,000 行，仅支持目录；预览保存 SHA-256，确认重新读取并核验。错误整批阻断，事务失败不部分写入。重复导入按来源系统、来源 ID、REAL/DEMO 更新，不删除缺失记录，不产生完整覆盖证明。本机路径在多实例上线前需替换为受控共享持久存储。
+
+正式验证：
+
+```sh
+python3 deployment/scripts/check-environments.py
+python3 deployment/scripts/auth-smoke.py
+python3 deployment/scripts/catalog-smoke.py
+# 浏览器验收需已安装锁定 Web 依赖和 Playwright Chromium。
+XMUT_WEB_TEST=1 python3 deployment/scripts/catalog-smoke.py
+```
+
+测试进程使用独立 Nacos group；结束关闭自身进程，清理本轮随机前缀用户、资源、批次与文件，保留迁移和管理员。日志私密，公开摘要在 `开发文档/docs/verification/2026-10-11/m2/`。不要公开私密日志或完整 Compose 配置。

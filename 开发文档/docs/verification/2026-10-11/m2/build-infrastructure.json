@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-11",
+  "java": {
+    "modules": 7,
+    "command": "./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp verify",
+    "testsPassed": 5,
+    "failed": 0
+  },
+  "web": {
+    "command": "npm ci --ignore-scripts && npm run build",
+    "typescript": "5.9.3",
+    "dependencyAuditVulnerabilities": 0,
+    "result": "PASS",
+    "note": "Full Element Plus bundle currently exceeds 500 kB warning threshold; build succeeds"
+  },
+  "infrastructure": {
+    "command": "deployment/scripts/verify-dev.sh",
+    "testsPassed": 4,
+    "failed": 0
+  },
+  "isolation": {
+    "command": "python3 deployment/scripts/check-environments.py",
+    "result": "PASS"
+  },
+  "productionStarted": false,
+  "localStartup": {
+    "command": "python3 deployment/scripts/dev-workspace.py start/stop/status",
+    "result": "PASS",
+    "services": [
+      "identity-service",
+      "booking-service",
+      "gateway",
+      "web-admin"
+    ],
+    "scope": "dev only; PID/start-time ownership checked; Docker remains running"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-11",
+  "mavenVerify": "PASS",
+  "javaModules": 7,
+  "testsPassed": 12,
+  "suites": [
+    {
+      "suite": "org.shen.graduationproject.DependencySmokeTests",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.shen.graduationproject.GraduationProjectApplicationTests",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.shen.graduationproject.TimeWindowTests",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.shen.gateway.GatewayApplicationTests",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "webTypeCheckAndProductionBuild": "PASS",
+  "migrationV2Checksum": 410231313,
+  "scope": "单元与装配检查，不替代真实 MySQL 事务及浏览器验收"
+}

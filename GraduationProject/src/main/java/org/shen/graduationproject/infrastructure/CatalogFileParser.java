@@ -24,7 +24,7 @@ public class CatalogFileParser {
     public record Parsed(int sourceRows, List<Candidate> rows, List<Error> errors, Map<String, String> mapping) {
     }
 
-    private record Source(int row, Map<String, Object> values) {
+    public record Source(int row, Map<String, Object> values) {
     }
 
     private final ObjectMapper json;
@@ -64,7 +64,10 @@ public class CatalogFileParser {
         ZipSecureFile.setMaxTextSize(8388608);
     }
 
-    private List<Source> sources(byte[] bytes, String key) {
+    /**
+     * 复用严格的 Excel/JSON 读取；完整占用快照可显式提交空数组。
+     */
+    public List<Source> readRows(byte[] bytes, String key, boolean allowEmpty) {
         try {
             var out = new ArrayList<Source>();
             if (key.endsWith(".json")) {
@@ -123,7 +126,7 @@ public class CatalogFileParser {
                     }
                 }
             }
-            if (out.isEmpty()) throw new BusinessException(400, "INVALID_IMPORT_FILE", "文件没有数据行");
+            if (out.isEmpty() && !allowEmpty) throw new BusinessException(400, "INVALID_IMPORT_FILE", "文件没有数据行");
             return out;
         } catch (BusinessException controlled) {
             throw controlled;
@@ -162,7 +165,7 @@ public class CatalogFileParser {
     }
 
     public Parsed parse(byte[] bytes, String key, String source, String mode, String group, Map<String, String> override) {
-        List<Source> sources = sources(bytes, key);
+        List<Source> sources = readRows(bytes, key, false);
         Set<String> columns = new HashSet<>();
         sources.forEach(r -> columns.addAll(r.values().keySet()));
         if (!ALIASES.keySet().containsAll(override.keySet()) || override.values().stream().anyMatch(v -> v == null || v.length() > 100 || v.toLowerCase(Locale.ROOT).matches(".*(password|token|cookie|authorization|密码|口令).*")))

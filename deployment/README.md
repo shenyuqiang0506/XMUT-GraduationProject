@@ -67,7 +67,7 @@ java -jar GraduationProject/target/GraduationProject-0.0.1-SNAPSHOT.jar
 
 集成测试验证 MySQL/InnoDB 回滚、Redis 读写、RabbitMQ 消息收发、Nacos 配置导入与服务注册。测试只临时创建自己的表、key 和独占队列，结束后清理。M2 身份与目录 Flyway 迁移已完成；基础设施测试与正式 API 验收分别执行。
 
-`InfrastructureIT` 默认不执行，需要 `verify-dev.sh` 设置 `XMUT_INFRA_TEST=true`；该脚本固定为 dev，不对 prod 执行业务写入测试。普通 `mvn verify` 继续运行不依赖 Docker 的原有 5 项测试。
+`InfrastructureIT` 默认不执行，需要 `verify-dev.sh` 设置 `XMUT_INFRA_TEST=true`；该脚本固定为 dev，不对 prod 执行业务写入测试。普通 `mvn verify` 执行不依赖 Docker 的 12 项测试，包含工具与时间窗口边界验证。
 
 ## M1 后端调用链与 AI 验证
 
@@ -169,3 +169,14 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/catalog-smoke.py
 ```
 
 测试进程使用独立 Nacos group；结束关闭自身进程，清理本轮随机前缀用户、资源、批次与文件，保留迁移和管理员。日志私密，公开摘要在 `开发文档/docs/verification/2026-10-11/m2/`。不要公开私密日志或完整 Compose 配置。
+
+## M3 可用性基础
+
+```sh
+# 先停止已经运行的 Java / Web，再执行带浏览器的独立 dev 验收。
+XMUT_WEB_TEST=1 python3 deployment/scripts/availability-smoke.py
+```
+
+脚本使用真实 MySQL / Redis / Nacos，临时创建自己的来源、资源、账号和明确标记的测试策略，检查覆盖、开放、占用、组合与事务回滚；结束后清理本轮资料，恢复原生效策略并停止自己启动的进程。公开结果位于 `开发文档/docs/verification/2026-10-11/m3/`，私密日志不进 Git。
+
+M3 的 Flyway V2 已在本机 dev 执行，不得重新排版；以后结构变更新增迁移。新环境策略为空，需系统管理员依据已确认制度显式配置 REAL，DEMO 草案只供演示。联合申请 / 审批 / 取消尚待下一步，当前查询不创建暂占。详细字段、接口与恢复说明见 [M3 可用性基础验收](../开发文档/docs/development/14-M3可用性基础验收.md)。

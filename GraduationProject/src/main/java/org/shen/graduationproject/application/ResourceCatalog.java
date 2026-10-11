@@ -71,7 +71,12 @@ public class ResourceCatalog {
     public Map<String, Object> detail(AuthActor actor, long id) {
         var rows = sql.queryForList("SELECT r.* FROM resource r WHERE r.id=? AND (" + access.visibleSql(actor) + ")", id);
         if (rows.isEmpty()) throw new BusinessException(404, "NOT_FOUND", "资源不存在或不可见");
-        return view(rows.getFirst());
+        var result = view(rows.getFirst());
+        result.put("openingRules", sql.queryForList("SELECT weekday,start_local,end_local,valid_from,valid_to,enabled FROM resource_opening_rule WHERE resource_id=? ORDER BY weekday,start_local", id)
+                .stream().map(r -> Map.of("weekday", r.get("weekday"), "startLocal", r.get("start_local").toString(),
+                        "endLocal", r.get("end_local").toString(), "validFrom", r.get("valid_from").toString(),
+                        "validTo", r.get("valid_to").toString(), "enabled", ((Number) r.get("enabled")).intValue() == 1)).toList());
+        return result;
     }
 
     public Map<String, Object> list(AuthActor actor, int page, int size, Map<String, String> filters) {

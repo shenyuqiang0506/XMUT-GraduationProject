@@ -26,6 +26,7 @@ public class CatalogImports {
     private final CatalogFileParser parser;
     private final ResourceCatalog catalog;
     private final ObjectMapper json;
+    private final TemporalImports temporal;
 
     private Map<String, Object> object(String text, int maximum) {
         try {
@@ -84,6 +85,8 @@ public class CatalogImports {
     }
 
     public CatalogIdempotency.Result preview(AuthActor actor, String key, MultipartFile file, String type, String source, String mode, String mappingText, String contextText) {
+        if (!"RESOURCE_CATALOG".equals(type))
+            return temporal.preview(actor, key, file, type, source, mode, mappingText, contextText);
         access.administrator(actor);
         if (!"RESOURCE_CATALOG".equals(type) || !source.matches("[A-Za-z0-9_-]{1,32}") || !Set.of("REAL", "DEMO").contains(mode))
             throw new BusinessException(400, "INVALID_IMPORT_TYPE", "当前阶段支持 RESOURCE_CATALOG，必须指定来源和 REAL/DEMO");
@@ -133,7 +136,9 @@ public class CatalogImports {
     }
 
     public CatalogIdempotency.Result commit(AuthActor actor, String key, long id) {
-        batch(actor, id, false);
+        var initialBatch = batch(actor, id, false);
+        if (!"RESOURCE_CATALOG".equals(initialBatch.get("import_type")))
+            return temporal.commit(actor, key, id);
         try {
             return idempotency.execute(actor, "IMPORT_COMMIT:" + id, key, Map.of("batchId", Long.toString(id)), () -> {
                 var batch = batch(actor, id, true);

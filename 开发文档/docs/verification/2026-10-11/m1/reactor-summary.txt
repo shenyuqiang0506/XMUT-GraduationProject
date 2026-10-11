@@ -1,0 +1,15 @@
+[INFO] Reactor Summary for xmut-graduation-project 0.0.1-SNAPSHOT:
+[INFO]
+[INFO] xmut-graduation-project ............................ SUCCESS [  0.001 s]
+[INFO] common-contracts ................................... SUCCESS [  0.257 s]
+[INFO] service-support .................................... SUCCESS [  0.045 s]
+[INFO] identity-service ................................... SUCCESS [  0.235 s]
+[INFO] booking-service .................................... SUCCESS [  3.126 s]
+[INFO] ai-service ......................................... SUCCESS [  0.207 s]
+[INFO] gateway ............................................ SUCCESS [  5.210 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  9.239 s
+[INFO] Finished at: 2026-10-11T14:55:01+08:00
+[INFO] ------------------------------------------------------------------------

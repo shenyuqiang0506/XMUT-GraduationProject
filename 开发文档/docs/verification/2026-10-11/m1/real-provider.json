@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-11",
+  "mode": "real-provider",
+  "model": "deepseek-flash",
+  "checks": [
+    {
+      "check": "All four independent services started with dev Nacos configuration",
+      "result": "PASS"
+    },
+    {
+      "check": "Gateway lb route -> booking -> Feign/LoadBalancer -> identity; traceId preserved",
+      "result": "PASS"
+    },
+    {
+      "check": "Unauthenticated gateway request rejected with traced JSON response",
+      "result": "PASS"
+    },
+    {
+      "check": "Wrong gateway password and direct unauthenticated service requests rejected",
+      "result": "PASS"
+    },
+    {
+      "check": "Invalid incoming traceId replaced and consistently propagated",
+      "result": "PASS"
+    },
+    {
+      "check": "Unknown DEMO resource rejected",
+      "result": "PASS"
+    },
+    {
+      "check": "AI request validation rejects empty text",
+      "result": "PASS"
+    },
+    {
+      "check": "Spring AI -> model -> read-only tool -> Feign -> booking -> model final answer (real-provider)",
+      "result": "PASS"
+    },
+    {
+      "check": "Unavailable downstream identity mapped to controlled 503",
+      "result": "PASS"
+    }
+  ],
+  "passed": 9,
+  "failed": 0,
+  "scope": "M1 DEMO probes; not business authentication or booking acceptance"
+}

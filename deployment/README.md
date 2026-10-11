@@ -45,7 +45,7 @@ python3 deployment/scripts/bootstrap-nacos.py dev
 deployment/scripts/compose.sh dev ps
 ```
 
-Nacos 初始化脚本使用已保存的管理员密码，首次初始化后发布 `GraduationProject.properties` 中的 `platform.environment=dev`。重复运行会验证登录和已有标记，不覆盖已有业务配置。Nacos 默认管理员名为 `nacos`；密码见私密账号记录。
+Nacos 初始化脚本使用已保存的管理员密码，首次初始化后发布各服务 Data ID（booking-service、identity-service、ai-service、gateway 的 `.properties`，并保留旧 GraduationProject）的 `platform.environment=dev`。重复运行会验证登录和已有标记，不覆盖已有业务配置。Nacos 默认管理员名为 `nacos`；密码见私密账号记录。
 
 MySQL 初始化只在**空数据卷**运行。健康检查会验证 booking 账号能查询自己的库，而不只是数据库进程存活。调整 `.env` 不会自动修改已有 MySQL、RabbitMQ 或 Nacos 账号；轮换密码需要先修改对应服务，再同步环境文件、账号记录与 Java 配置文件。
 
@@ -62,12 +62,41 @@ deployment/scripts/verify-dev.sh
 set -a
 . deployment/secrets/dev/backend.env
 set +a
-./GraduationProject/mvnw -s .mvn/settings.xml -pl GraduationProject spring-boot:run
+java -jar GraduationProject/target/GraduationProject-0.0.1-SNAPSHOT.jar
 ```
 
 集成测试验证 MySQL/InnoDB 回滚、Redis 读写、RabbitMQ 消息收发、Nacos 配置导入与服务注册。测试只临时创建自己的表、key 和独占队列，结束后清理。业务 Flyway 迁移尚未编写；Flyway 能连接真实数据库不表示业务表已完成。
 
 `InfrastructureIT` 默认不执行，需要 `verify-dev.sh` 设置 `XMUT_INFRA_TEST=true`；该脚本固定为 dev，不对 prod 执行业务写入测试。普通 `mvn verify` 继续运行不依赖 Docker 的原有 5 项测试。
+
+## M1 后端调用链与 AI 验证
+
+```sh
+# 先执行根目录 Maven verify，准备四个可运行 jar。
+./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp verify
+python3 deployment/scripts/init-m1.py
+python3 deployment/scripts/bootstrap-nacos.py dev
+# 无外部模型费用：本机 OpenAI 兼容协议模拟器。
+python3 deployment/scripts/m1-smoke.py
+# 真实服务：读取已被忽略的 deployment/.env.ai，可能产生模型费用。
+python3 deployment/scripts/m1-smoke.py --real-model
+```
+
+`deployment/.env.ai` 使用如下变量（填写真实值到本机文件，权限 600）：
+
+```dotenv
+AI_BASE_URL=https://api.deepseek.com
+AI_MODEL=deepseek-flash
+AI_API_KEY=replace-with-model-api-key
+```
+
+验证器会自动读取 `secrets/dev/backend.env`、`secrets/dev/m1.env`，为四个 Java 进程启用 `dev,m1`，为 AI 额外启用 `ai`；8081–8084 被占用时会退出，避免停止已有程序。开发凭据只保存一次，生成器不覆盖已有文件；它与 Nacos 管理员密码及模型 API key 是三套不同凭据。
+
+调用链：网关 `/api/v1/m1/booking/status` → booking → identity；网关 POST `/api/v1/m1/ai/query` → Spring AI → `getResourceDetails` → booking → 模型回复。工具只读 `demo-venue-1`，数据标记 `DEMO`，可用状态 `UNKNOWN`，不会创建预约。所有内部端点使用 `/internal/m1/`，不是 04 文档的正式业务 API。
+
+模拟器覆盖错误密码、未认证直连、非法 traceId、空输入、模型失败/超时、缺少工具、非法工具参数及重复工具调用；真实模式验证真实模型的工具往返。每次工具上限 2，模型 SDK 重试关闭，默认单次模型请求超时 15 秒；模拟超时用 1 秒。M1 Basic 认证仅用于本机技术验证，生产会拒绝该 profile。
+
+运行日志保存在被忽略的 `secrets/dev/m1-stub-logs/`、`m1-real-logs/`；公开结果只保存无密钥的检查摘要到 `开发文档/docs/verification/2026-10-11/m1/`。完成后验证器关闭自己启动的 Java 进程，Docker dev 保持运行。
 
 ## 停止、重启与数据
 

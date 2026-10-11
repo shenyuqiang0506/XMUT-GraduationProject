@@ -1,5 +1,7 @@
 package org.shen.graduationproject.infrastructure;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.List;
 
 import org.shen.platform.contracts.AuthActor;
@@ -10,12 +12,9 @@ import org.springframework.stereotype.Component;
 
 @Component
 @Profile("business & !m1")
+@RequiredArgsConstructor
 public class CatalogAccess {
     private final JdbcTemplate sql;
-
-    public CatalogAccess(JdbcTemplate sql) {
-        this.sql = sql;
-    }
 
     public static long id(String value) {
         try {

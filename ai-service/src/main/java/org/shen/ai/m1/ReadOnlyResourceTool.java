@@ -1,5 +1,7 @@
 package org.shen.ai.m1;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -7,14 +9,11 @@ import java.util.Map;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
+@RequiredArgsConstructor
 public final class ReadOnlyResourceTool {
     private final BookingClient booking;
     private final List<Map<String, Object>> verified = new ArrayList<>();
     private final List<String> traces = new ArrayList<>();
-
-    public ReadOnlyResourceTool(BookingClient booking) {
-        this.booking = booking;
-    }
 
     @Tool(name = "getResourceDetails", description = "Read only. Fetch the DEMO resource demo-venue-1. UNKNOWN does not mean available. No bookings or writes.")
     public Map<String, Object> getResourceDetails(

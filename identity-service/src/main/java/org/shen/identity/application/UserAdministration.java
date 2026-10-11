@@ -1,5 +1,7 @@
 package org.shen.identity.application;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.*;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Supplier;
@@ -17,26 +19,17 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 @Profile("business & !m1")
+@RequiredArgsConstructor
 public class UserAdministration {
     public record Mutation(int status, Object data, boolean replayed) {
     }
 
     private final IdentityRepository repo;
     private final PasswordEncoder passwords;
-    private final AccessTokens tokens;
     private final RevocationCache cache;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
-
-    public UserAdministration(IdentityRepository repo, PasswordEncoder passwords, RevocationCache cache,
-                              TransactionTemplate transactions, ObjectMapper json, AccessTokens tokens) {
-        this.repo = repo;
-        this.passwords = passwords;
-        this.cache = cache;
-        this.transactions = transactions;
-        this.json = json;
-        this.tokens = tokens;
-    }
+    private final AccessTokens tokens;
 
     public Map<String, Object> view(IdentityRepository.User user) {
         return Map.of("id", Long.toString(user.id()), "username", user.username(), "displayName", user.displayName(),

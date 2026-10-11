@@ -1,5 +1,7 @@
 package org.shen.graduationproject.application;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.*;
 
 import org.shen.graduationproject.domain.CatalogCommands;
@@ -15,6 +17,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 @Profile("business & !m1")
+@RequiredArgsConstructor
 public class CatalogImports {
     private final JdbcTemplate sql;
     private final CatalogAccess access;
@@ -23,16 +26,6 @@ public class CatalogImports {
     private final CatalogFileParser parser;
     private final ResourceCatalog catalog;
     private final ObjectMapper json;
-
-    public CatalogImports(JdbcTemplate sql, CatalogAccess access, CatalogIdempotency idempotency, ImportStorage storage, CatalogFileParser parser, ResourceCatalog catalog, ObjectMapper json) {
-        this.sql = sql;
-        this.access = access;
-        this.idempotency = idempotency;
-        this.storage = storage;
-        this.parser = parser;
-        this.catalog = catalog;
-        this.json = json;
-    }
 
     private Map<String, Object> object(String text, int maximum) {
         try {

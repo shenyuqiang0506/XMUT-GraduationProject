@@ -1,0 +1,239 @@
+{
+  "date": "2026-10-11",
+  "scope": "Lombok required-args constructor refactor; business behavior unchanged",
+  "converted_classes": [
+    "GraduationProject/src/main/java/org/shen/graduationproject/m1/M1BookingController.java",
+    "GraduationProject/src/main/java/org/shen/graduationproject/controller/CatalogController.java",
+    "GraduationProject/src/main/java/org/shen/graduationproject/application/CatalogImports.java",
+    "GraduationProject/src/main/java/org/shen/graduationproject/application/ResourceCatalog.java",
+    "GraduationProject/src/main/java/org/shen/graduationproject/infrastructure/CatalogAccess.java",
+    "GraduationProject/src/main/java/org/shen/graduationproject/infrastructure/CatalogIdempotency.java",
+    "ai-service/src/main/java/org/shen/ai/m1/ReadOnlyResourceTool.java",
+    "ai-service/src/main/java/org/shen/ai/m1/M1AiController.java",
+    "identity-service/src/main/java/org/shen/identity/controller/AuthController.java",
+    "identity-service/src/main/java/org/shen/identity/controller/UsersController.java",
+    "identity-service/src/main/java/org/shen/identity/application/UserAdministration.java",
+    "identity-service/src/main/java/org/shen/identity/infrastructure/IdentityRepository.java",
+    "gateway/src/main/java/org/shen/gateway/GatewayErrors.java"
+  ],
+  "constructor_signature_and_access_comparison": {
+    "total": 13,
+    "passed": 13
+  },
+  "maven_clean_verify": {
+    "modules": 7,
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "regressions": {
+    "authentication": {
+      "date": "2026-10-11",
+      "mode": "dev-business-real-infrastructure",
+      "checks": [
+        {
+          "check": "Identity migration and dev-only administrator bootstrap; all three services ready",
+          "result": "PASS"
+        },
+        {
+          "check": "Gateway login, RS256 claims, authoritative administrator identity and traceId",
+          "result": "PASS"
+        },
+        {
+          "check": "Unauthenticated and forged identity headers rejected",
+          "result": "PASS"
+        },
+        {
+          "check": "Account creation is authorized, idempotent and rejects changed payloads",
+          "result": "PASS"
+        },
+        {
+          "check": "Wrong password rejected; database roles prevent student access and role-claim spoofing",
+          "result": "PASS"
+        },
+        {
+          "check": "Wrong audience/issuer, expired token, invalid session claim and non-RS256 algorithm rejected",
+          "result": "PASS"
+        },
+        {
+          "check": "Booking verifies signature and resolves current session through identity service",
+          "result": "PASS"
+        },
+        {
+          "check": "Refresh device binding, rotation, replay revocation and downstream enforcement",
+          "result": "PASS"
+        },
+        {
+          "check": "Concurrent refresh serializes; one rotation succeeds and replay revokes the session",
+          "result": "PASS"
+        },
+        {
+          "check": "Role changes revoke sessions; stale version rejected; disabled user cannot log in",
+          "result": "PASS"
+        },
+        {
+          "check": "Logout immediately revokes both access and refresh credentials",
+          "result": "PASS"
+        },
+        {
+          "check": "MySQL persists BCrypt/password and refresh hashes plus audit records, without plain credentials",
+          "result": "PASS"
+        },
+        {
+          "check": "Pagination and request validation enforce server-side limits",
+          "result": "PASS"
+        },
+        {
+          "check": "Identity outage produces controlled 503; no default-allow session fallback",
+          "result": "PASS"
+        },
+        {
+          "check": "Redis outage keeps authoritative DB session checks and logout revocation; new login fails closed when throttling is unavailable",
+          "result": "PASS"
+        }
+      ],
+      "passed": 15,
+      "failed": 0,
+      "scope": "Formal identity APIs; catalog and reservation acceptance are separate"
+    },
+    "catalog_import": {
+      "date": "2026-10-11",
+      "mode": "dev-business-real-infrastructure",
+      "checks": [
+        {
+          "check": "Booking Flyway migration, distinct database, approval-group membership validated against live identity",
+          "result": "PASS"
+        },
+        {
+          "check": "String IDs/unknown capacity preserved; create replay; student visibility; manager scope and REAL opening constraints",
+          "result": "PASS"
+        },
+        {
+          "check": "Optimistic version conflict and immutable source fields; invalid resource manager rejected",
+          "result": "PASS"
+        },
+        {
+          "check": "Equipment asset uniqueness rolls back the new resource without altering its owner",
+          "result": "PASS"
+        },
+        {
+          "check": "JSON uses actual 3 rows rather than totalResult=1132; preview/commit replay; raw sensitive fields excluded; default DRAFT",
+          "result": "PASS"
+        },
+        {
+          "check": "Repeat import updates existing source IDs with version increments; no duplicates or resource deletion",
+          "result": "PASS"
+        },
+        {
+          "check": "Conflicting IDs, negative capacity, missing name and duplicate rows block commit without partial writes",
+          "result": "PASS"
+        },
+        {
+          "check": "Explicit mapping resolves source ID ambiguity; sensitive-column mapping rejected",
+          "result": "PASS"
+        },
+        {
+          "check": "Actual XLSX parses Chinese headers, leading-zero IDs and unknown capacity correctly",
+          "result": "PASS"
+        },
+        {
+          "check": "REAL/DEMO filtering and real-source NO update closes previously OPEN catalog entry",
+          "result": "PASS"
+        },
+        {
+          "check": "Changed saved file hash blocks commit; client has no server storage path",
+          "result": "PASS"
+        },
+        {
+          "check": "Commit rechecks current group scope and rolls back after authority removal",
+          "result": "PASS"
+        },
+        {
+          "check": "File type/size/JSON format/import stage and list parameter limits enforced",
+          "result": "PASS"
+        }
+      ],
+      "passed": 13,
+      "failed": 0,
+      "scope": "M2 resource catalog only; availability/occupancy/booking are not asserted"
+    },
+    "m1_local_model": {
+      "date": "2026-10-11",
+      "mode": "local-protocol-stub",
+      "model": "m1-local-stub",
+      "checks": [
+        {
+          "check": "All four independent services started with dev Nacos configuration",
+          "result": "PASS"
+        },
+        {
+          "check": "Gateway lb route -> booking -> Feign/LoadBalancer -> identity; traceId preserved",
+          "result": "PASS"
+        },
+        {
+          "check": "Unauthenticated gateway request rejected with traced JSON response",
+          "result": "PASS"
+        },
+        {
+          "check": "Wrong gateway password and direct unauthenticated service requests rejected",
+          "result": "PASS"
+        },
+        {
+          "check": "Invalid incoming traceId replaced and consistently propagated",
+          "result": "PASS"
+        },
+        {
+          "check": "Unknown DEMO resource rejected",
+          "result": "PASS"
+        },
+        {
+          "check": "AI request validation rejects empty text",
+          "result": "PASS"
+        },
+        {
+          "check": "Spring AI -> model -> read-only tool -> Feign -> booking -> model final answer (local-protocol-stub)",
+          "result": "PASS"
+        },
+        {
+          "check": "OpenAI-compatible HTTP tool-call protocol and returned tool data verified",
+          "result": "PASS"
+        },
+        {
+          "check": "Controlled AI failure: STUB_FAIL",
+          "result": "PASS"
+        },
+        {
+          "check": "Controlled AI failure: STUB_TIMEOUT",
+          "result": "PASS"
+        },
+        {
+          "check": "Controlled AI failure: STUB_NO_TOOL",
+          "result": "PASS"
+        },
+        {
+          "check": "Controlled AI failure: STUB_INVALID_RESOURCE",
+          "result": "PASS"
+        },
+        {
+          "check": "Controlled AI failure: STUB_LOOP",
+          "result": "PASS"
+        },
+        {
+          "check": "Unavailable downstream identity mapped to controlled 503",
+          "result": "PASS"
+        }
+      ],
+      "passed": 15,
+      "failed": 0,
+      "scope": "M1 DEMO probes; not business authentication or booking acceptance"
+    }
+  },
+  "application_ports_after_checks": {
+    "8081": "free",
+    "8082": "free",
+    "8083": "free",
+    "8084": "free"
+  },
+  "browser_and_real_model_rerun": false
+}

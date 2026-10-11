@@ -1,5 +1,8 @@
 package org.shen.gateway;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 import org.shen.platform.contracts.ApiResponse;
 import org.shen.platform.contracts.TraceIds;
 import org.springframework.boot.webflux.error.ErrorWebExceptionHandler;
@@ -16,13 +19,10 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 @Profile("m1 | business")
 @Order(-2)
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class GatewayErrors implements ErrorWebExceptionHandler {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(GatewayErrors.class);
     private final ObjectMapper json;
-
-    GatewayErrors(ObjectMapper json) {
-        this.json = json;
-    }
 
     public Mono<Void> handle(ServerWebExchange exchange, Throwable failure) {
         LOG.warn("Gateway request failed traceId={} errorType={}", exchange.getResponse().getHeaders().getFirst(TraceIds.HEADER), failure.getClass().getName());

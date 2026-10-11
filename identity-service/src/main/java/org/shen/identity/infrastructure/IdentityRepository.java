@@ -1,5 +1,7 @@
 package org.shen.identity.infrastructure;
 
+import lombok.RequiredArgsConstructor;
+
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @Profile("business & !m1")
+@RequiredArgsConstructor
 public class IdentityRepository {
     public record User(long id, String username, String passwordHash, String displayName, String status, long version) {
     }
@@ -25,10 +28,6 @@ public class IdentityRepository {
     }
 
     private final JdbcTemplate sql;
-
-    public IdentityRepository(JdbcTemplate sql) {
-        this.sql = sql;
-    }
 
     private static final RowMapper<User> USER = (rs, n) -> new User(rs.getLong("id"), rs.getString("username"), rs.getString("password_hash"), rs.getString("display_name"), rs.getString("status"), rs.getLong("auth_version"));
     private static final RowMapper<Session> SESSION = (rs, n) -> new Session(rs.getLong("id"), rs.getLong("user_id"), rs.getString("device_id"), rs.getString("refresh_token_hash"), rs.getTimestamp("expires_at").toInstant(), rs.getTimestamp("revoked_at") != null);

@@ -1,5 +1,7 @@
 package org.shen.graduationproject.infrastructure;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -13,6 +15,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 @Profile("business & !m1")
+@RequiredArgsConstructor
 public class CatalogIdempotency {
     public record Result(int status, Object data, boolean replayed) {
     }
@@ -20,12 +23,6 @@ public class CatalogIdempotency {
     private final JdbcTemplate sql;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
-
-    public CatalogIdempotency(JdbcTemplate sql, TransactionTemplate transactions, ObjectMapper json) {
-        this.sql = sql;
-        this.transactions = transactions;
-        this.json = json;
-    }
 
     private Object canonical(Object value) {
         if (value instanceof Map<?, ?> map) {

@@ -1,5 +1,8 @@
 package org.shen.ai.m1;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 import java.util.Map;
 
 import jakarta.validation.Valid;
@@ -17,17 +20,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @Profile("m1 & ai")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class M1AiController {
     record Query(@NotBlank @Size(max = 512) String text) {
     }
 
     private final ChatClient chat;
     private final BookingClient booking;
-
-    M1AiController(ChatClient chat, BookingClient booking) {
-        this.chat = chat;
-        this.booking = booking;
-    }
 
     @PostMapping("/internal/m1/query")
     ResponseEntity<?> query(@Valid @RequestBody Query query) {

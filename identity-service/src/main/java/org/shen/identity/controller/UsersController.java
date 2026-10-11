@@ -1,5 +1,8 @@
 package org.shen.identity.controller;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 import jakarta.validation.Valid;
 import org.shen.identity.application.UserAdministration;
 import org.shen.identity.domain.AuthCommands;
@@ -12,14 +15,10 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @Profile("business & !m1")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class UsersController {
-    private final org.shen.identity.infrastructure.IdentityRepository repo;
     private final UserAdministration users;
-
-    UsersController(UserAdministration users, org.shen.identity.infrastructure.IdentityRepository repo) {
-        this.users = users;
-        this.repo = repo;
-    }
+    private final org.shen.identity.infrastructure.IdentityRepository repo;
 
     @GetMapping("/internal/auth/users/{id}")
     ApiResponse<?> internalUser(@PathVariable long id) {

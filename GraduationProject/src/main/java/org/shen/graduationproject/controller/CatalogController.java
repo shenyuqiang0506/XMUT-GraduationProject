@@ -1,5 +1,8 @@
 package org.shen.graduationproject.controller;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 import java.util.Map;
 
 import jakarta.validation.Valid;
@@ -16,14 +19,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @Profile("business & !m1")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class CatalogController {
     private final ResourceCatalog resources;
     private final CatalogImports imports;
-
-    CatalogController(ResourceCatalog resources, CatalogImports imports) {
-        this.resources = resources;
-        this.imports = imports;
-    }
 
     private ApiResponse<?> ok(Object data) {
         return ApiResponse.success(data, MDC.get(TraceIds.MDC_KEY));

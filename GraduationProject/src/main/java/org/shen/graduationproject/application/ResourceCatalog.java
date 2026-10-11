@@ -1,5 +1,7 @@
 package org.shen.graduationproject.application;
 
+import lombok.RequiredArgsConstructor;
+
 import java.util.*;
 
 import jakarta.validation.Validator;
@@ -17,6 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 @Profile("business & !m1")
+@RequiredArgsConstructor
 public class ResourceCatalog {
     private final JdbcTemplate sql;
     private final CatalogAccess access;
@@ -24,15 +27,6 @@ public class ResourceCatalog {
     private final AuthorizedUsers users;
     private final ObjectMapper json;
     private final Validator validator;
-
-    public ResourceCatalog(JdbcTemplate sql, CatalogAccess access, CatalogIdempotency idempotency, AuthorizedUsers users, ObjectMapper json, Validator validator) {
-        this.sql = sql;
-        this.access = access;
-        this.idempotency = idempotency;
-        this.users = users;
-        this.json = json;
-        this.validator = validator;
-    }
 
     public void validate(CatalogCommands.Resource input) {
         if (!validator.validate(input).isEmpty())

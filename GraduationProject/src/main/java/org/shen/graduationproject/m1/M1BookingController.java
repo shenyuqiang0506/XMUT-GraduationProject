@@ -1,5 +1,8 @@
 package org.shen.graduationproject.m1;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+
 import java.util.Map;
 
 import org.shen.platform.contracts.ApiResponse;
@@ -13,12 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @Profile("m1")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class M1BookingController {
     private final IdentityClient identity;
-
-    M1BookingController(IdentityClient identity) {
-        this.identity = identity;
-    }
 
     @GetMapping("/internal/m1/status")
     ApiResponse<Map<String, Object>> status() {

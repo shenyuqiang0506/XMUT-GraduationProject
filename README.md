@@ -16,6 +16,18 @@
 - `开发文档/`：需求、架构、数据库、接口与验收设计。
 - `deployment/`：dev/prod 独立 Docker 配置、凭据生成与真实服务验证脚本。
 
+## IDEA 导入
+
+在 IDEA 中打开仓库根目录的 `pom.xml`，导入整个 Maven 工程。Maven 面板应包含 common-contracts、service-support、identity-service、booking-service、ai-service 和 gateway。`org.shen.platform` 来自 common-contracts/service-support，单独导入内层 `GraduationProject/pom.xml` 会缺少这些模块。
+
+已有单模块窗口可通过 Maven 面板的“添加 Maven 项目”选择外层 `pom.xml`，然后同步。若需要独立打开 booking 工程，先在仓库根目录把公共模块安装到本机 Maven 仓库，再同步 IDEA：
+
+```sh
+./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp -pl service-support -am install -DskipTests
+```
+
+公共模块修改后，单模块工程需重新执行该命令；完整工程导入可直接使用模块源码。
+
 ## 构建与验证
 
 需要 JDK 21 和网络连接。Maven Wrapper 会自动下载 Maven 3.10.0，无需全局安装 Maven。在仓库根目录执行：

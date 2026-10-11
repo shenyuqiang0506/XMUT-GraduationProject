@@ -1,8 +1,8 @@
-# 校园资源预约平台：服务与数据关系
+# 校园资源预约：服务与数据关系
 
 ```mermaid
 C4Container
-  title 校园资源预约平台的容器关系
+  title 校园资源预约的容器关系
   Container(web, "Web 管理端", "Vue 3 / TypeScript", "资源维护、审批和统计")
   Container(app, "学生 App", "uni-app / Vue 3", "iOS 和 Android 查询与预约")
   Container(gateway, "API 网关", "Spring Cloud Gateway", "路由、身份检查和限流")

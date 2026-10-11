@@ -1,12 +1,12 @@
-# 校园资源预约平台：系统边界
+# 校园资源预约：系统边界
 
 ```mermaid
 C4Context
-  title 校园资源预约平台的系统边界
+  title 校园资源预约的系统边界
   Person(student, "学生", "查询资源并提交活动申请")
   Person(manager, "资源管理员", "管理资源并审批申请")
   Person(admin, "系统管理员", "维护账号与全局规则")
-  System(platform, "校园资源智能预约平台", "Web 与 iOS/Android 共用预约业务")
+  System(platform, "校园资源预约", "Web 与 iOS/Android 共用预约业务")
   System_Ext(schoolData, "学校教务与场地资料", "提供目录和经确认的占用信息")
   System_Ext(modelApi, "大模型服务", "理解需求并请求查询工具")
   Rel(student, platform, "查询、申请和确认候补", "HTTPS")

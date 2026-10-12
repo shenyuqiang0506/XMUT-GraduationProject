@@ -34,8 +34,9 @@ interface Calendar {
   }[]
 }
 
+// 日常业务默认使用真实来源；测试资料必须显式选择隔离模式。
 const start = ref<Date>(), end = ref<Date>(), campus = ref(''), building = ref(''), participants = ref(20),
-    mode = ref('DEMO')
+    mode = ref('REAL')
 const features = ref<string[]>([]), equipment = ref<{ type: string; count: number }[]>([])
 const result = ref<SearchResult>(), calendar = ref<Calendar>(), resourceId = ref(''), resources = ref<Resource[]>([])
 const resourcePage = ref(1), resourceTotal = ref(0), busy = ref(false), error = ref('')

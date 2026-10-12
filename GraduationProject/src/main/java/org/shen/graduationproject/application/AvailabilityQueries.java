@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 
 @Service
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor
 public class AvailabilityQueries {
     private final JdbcTemplate sql;

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Exercise business authentication against dev MySQL/Redis/Nacos and Gateway."""
 import base64
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
 import importlib.util
 import json
@@ -18,6 +20,9 @@ spec = importlib.util.spec_from_file_location('business_runtime', REPO / 'deploy
 runtime = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runtime)
 PRIVATE = REPO / 'deployment/secrets/dev'
+# 按上海日期留存本轮证据，不覆盖历史阶段报告。
+REPORT_DATE = datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
+REPORT_DIR = REPO / '开发文档/docs/verification' / REPORT_DATE / 'business'
 
 
 def request(url, method='GET', payload=None, token=None, trace=None, key=None, extra=None):
@@ -124,6 +129,14 @@ def main():
         assert status == 200 and body['data']['roles'] == ['SYSTEM_ADMIN']
         assert body['traceId'] == headers['X-Trace-Id'] == run_id + '-request'
         record('Gateway login, RS256 claims, authoritative administrator identity and traceId')
+        # 旧演示路径已移除：合法身份也不能访问，Basic 凭据不能代替正式 JWT。
+        for path, method, payload in [('/m1/booking/status', 'GET', None), ('/m1/ai/query', 'POST', {'text': '查询资源'})]:
+            assert call(path, method, payload, admin)[0] == 404
+        for port, path in [(8082, '/internal/m1/status'), (8082, '/internal/m1/resources/demo-venue-1'), (8083, '/internal/m1/status')]:
+            assert request(f'http://127.0.0.1:{port}{path}', token=admin)[0] == 404
+        basic = base64.b64encode(b'retired-probe:invalid-password').decode()
+        assert call('/resources', extra={'Authorization': 'Basic ' + basic})[0] == 401
+        record('演示路由与内部接口均返回 404，Basic 认证不能访问正式业务')
         status, body, _ = call('/users/me', extra={'X-User-Id': '1', 'X-Roles': 'SYSTEM_ADMIN'})
         assert status == 401 and body['code'] == 'UNAUTHORIZED'
         record('Unauthenticated and forged identity headers rejected')
@@ -261,9 +274,9 @@ def main():
         status,body,_=request('http://127.0.0.1:8083/users/me',token=live)
         assert status==401
         record('Redis outage keeps authoritative DB session checks and logout revocation; new login fails closed when throttling is unavailable')
-        destination = REPO / '开发文档/docs/verification/2026-10-11/m2'
+        destination = REPORT_DIR
         destination.mkdir(parents=True, exist_ok=True)
-        (destination / 'authentication.json').write_text(json.dumps({'date': '2026-10-11', 'mode': 'dev-business-real-infrastructure',
+        (destination / 'authentication.json').write_text(json.dumps({'date': REPORT_DATE, 'mode': 'dev-business-real-infrastructure',
             'checks': checks, 'passed': len(checks), 'failed': 0, 'scope': 'Formal identity APIs; catalog and reservation acceptance are separate'}, ensure_ascii=False, indent=2) + '\n')
     finally:
         for _, process, log in reversed(children):

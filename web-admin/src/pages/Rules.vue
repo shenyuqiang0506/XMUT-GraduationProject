@@ -43,17 +43,18 @@ const resourcePage = ref(1), resourceTotal = ref(0), rules = ref<OpeningRule[]>(
 const source = ref('MANUAL'), sourceKey = ref<string>(crypto.randomUUID()), start = ref<Date>(), end = ref<Date>(),
     reason = ref('MAINTENANCE')
 const occupancyPage = ref(1), occupancyTotal = ref(0), policyLoading = ref(false)
-const scope = ref('DEMO'), policyVersion = ref(0), basis = ref(''),
+// 日常业务默认使用真实来源；测试资料必须显式选择隔离模式。
+const scope = ref('REAL'), policyVersion = ref(0), basis = ref(''),
     settings = reactive<Record<string, number | undefined>>({})
 const fields = [
-  {key: 'pendingApprovalTtlMinutes', label: '待审批暂占（分钟）', min: 1, max: 10080, demo: 60},
-  {key: 'waitlistOfferTtlMinutes', label: '候补确认时限（分钟）', min: 1, max: 1440, demo: 15},
-  {key: 'bookingLeadMinutes', label: '最晚提前申请（分钟）', min: 0, max: 43200, demo: 0},
-  {key: 'cancelLeadMinutes', label: '取消提前量（分钟）', min: 0, max: 43200, demo: 30},
-  {key: 'maxBookingDaysAhead', label: '最远预约天数', min: 1, max: 365, demo: 30},
-  {key: 'maxDurationMinutes', label: '活动最大时长（分钟）', min: 1, max: 1440, demo: 240},
-  {key: 'maxActiveApplicationsPerUser', label: '同时有效申请上限', min: 1, max: 100, demo: 3},
-  {key: 'coverageFreshnessMinutes', label: '来源覆盖有效时长（分钟）', min: 1, max: 10080, demo: 120}
+  {key: 'pendingApprovalTtlMinutes', label: '待审批暂占（分钟）', min: 1, max: 10080},
+  {key: 'waitlistOfferTtlMinutes', label: '候补确认时限（分钟）', min: 1, max: 1440},
+  {key: 'bookingLeadMinutes', label: '最晚提前申请（分钟）', min: 0, max: 43200},
+  {key: 'cancelLeadMinutes', label: '取消提前量（分钟）', min: 0, max: 43200},
+  {key: 'maxBookingDaysAhead', label: '最远预约天数', min: 1, max: 365},
+  {key: 'maxDurationMinutes', label: '活动最大时长（分钟）', min: 1, max: 1440},
+  {key: 'maxActiveApplicationsPerUser', label: '同时有效申请上限', min: 1, max: 100},
+  {key: 'coverageFreshnessMinutes', label: '来源覆盖有效时长（分钟）', min: 1, max: 10080}
 ]
 
 async function loadResources() {
@@ -113,8 +114,8 @@ async function loadPolicy() {
     if (scope.value !== requestedScope) return
     policyVersion.value = p.version
     basis.value = p.basis || ''
-    // 演示草案也需要显式保存；真实规则无默认值，不能把演示参数直接当成学校制度。
-    fields.forEach(f => settings[f.key] = p.settings?.[f.key] ?? (requestedScope === 'DEMO' ? f.demo : undefined))
+    // 参数只能来自已保存的制度配置；未配置时留空，避免把示例数值当成真实规则。
+    fields.forEach(f => settings[f.key] = p.settings?.[f.key])
   } catch (e) {
     if (scope.value === requestedScope) error.value = explain(e)
   } finally {

@@ -15,7 +15,7 @@ import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("business & !m1")
+@Profile("business")
 public class AccessTokens {
     private final JwtEncoder encoder;
     private final javax.crypto.SecretKey passwordFingerprintKey;

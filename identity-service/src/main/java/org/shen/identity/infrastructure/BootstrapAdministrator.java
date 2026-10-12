@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
-@Profile("bootstrap-admin & business & !m1")
+@Profile("bootstrap-admin & business")
 class BootstrapAdministrator implements ApplicationRunner {
     private final IdentityRepository repo;
     private final PasswordEncoder passwords;

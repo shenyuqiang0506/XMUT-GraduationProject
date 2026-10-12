@@ -18,7 +18,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor
 public class UserAdministration {
     public record Mutation(int status, Object data, boolean replayed) {

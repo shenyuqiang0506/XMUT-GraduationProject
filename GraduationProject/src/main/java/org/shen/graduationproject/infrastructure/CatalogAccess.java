@@ -11,7 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor
 public class CatalogAccess {
     private final JdbcTemplate sql;

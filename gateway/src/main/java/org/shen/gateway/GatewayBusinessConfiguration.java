@@ -16,7 +16,7 @@ import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration(proxyBeanMethods = false)
-@Profile("business & !m1")
+@Profile("business")
 class GatewayBusinessConfiguration {
     @Bean
     ReactiveJwtDecoder gatewayJwtDecoder(@Value("${JWT_PUBLIC_KEY_PATH}") String path,

@@ -15,7 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor
 public class AvailabilityMaintenance {
     private final JdbcTemplate sql;

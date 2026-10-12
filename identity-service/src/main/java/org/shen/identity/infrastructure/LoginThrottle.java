@@ -10,7 +10,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("business & !m1")
+@Profile("business")
 public class LoginThrottle {
     private final StringRedisTemplate redis;
     private final String prefix;

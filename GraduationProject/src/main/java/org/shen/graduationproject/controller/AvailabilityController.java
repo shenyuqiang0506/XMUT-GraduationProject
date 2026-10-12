@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
  * 管理端维护和普通用户查询共用服务端权限、时间及来源校验。
  */
 @RestController
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class AvailabilityController {
     private final AvailabilityQueries queries;

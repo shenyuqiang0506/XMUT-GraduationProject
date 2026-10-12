@@ -49,7 +49,7 @@ def main():
         record = private / 'business-accounts.md'
         fd = os.open(record, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, 'w') as stream:
-            stream.write('# dev 正式业务初始化账号\n\n仅在 bootstrap-admin 首次启动成功后生效；不同于 M1/Nacos 账号。\n\n')
+            stream.write('# dev 正式业务初始化账号\n\n仅在 bootstrap-admin 首次启动成功后生效；不同于 Nacos 管理账号。\n\n')
             stream.write('用户名：`' + identity['AUTH_ADMIN_USERNAME'] + '`\n\n密码：`' + identity['AUTH_ADMIN_PASSWORD'] + '`\n')
     envfile(targets[3], identity)
     print(environment + ': authentication files generated; keys and passwords not printed. Production was not started.')

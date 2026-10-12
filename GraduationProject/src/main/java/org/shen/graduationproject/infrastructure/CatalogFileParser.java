@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-@Profile("business & !m1")
+@Profile("business")
 public class CatalogFileParser {
     public record Candidate(int rowNumber, CatalogCommands.Resource resource, Map<String, Object> raw) {
     }

@@ -17,7 +17,7 @@ import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-@Profile("m1 | business")
+@Profile("business")
 @Order(-2)
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class GatewayErrors implements ErrorWebExceptionHandler {

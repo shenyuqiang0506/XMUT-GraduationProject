@@ -16,7 +16,7 @@ import org.springframework.core.Ordered;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Configuration(proxyBeanMethods = false)
-@Import({M1Security.class, ServiceErrors.class, BusinessSecurity.class})
+@Import({ServiceErrors.class, BusinessSecurity.class})
 public class ServletSupport {
     @Bean
     FilterRegistrationBean<OncePerRequestFilter> traceFilter() {

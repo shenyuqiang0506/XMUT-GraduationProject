@@ -17,7 +17,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor
 public class IdentityRepository {
     public record User(long id, String username, String passwordHash, String displayName, String status, long version) {

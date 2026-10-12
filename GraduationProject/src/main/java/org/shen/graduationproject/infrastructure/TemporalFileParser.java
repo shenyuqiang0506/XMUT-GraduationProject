@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor
 public class TemporalFileParser {
     private final CatalogFileParser files;

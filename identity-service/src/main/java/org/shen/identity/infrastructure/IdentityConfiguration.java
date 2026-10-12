@@ -7,7 +7,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration(proxyBeanMethods = false)
-@Profile("business & !m1")
+@Profile("business")
 class IdentityConfiguration {
     @Bean
     PasswordEncoder businessPasswords() {

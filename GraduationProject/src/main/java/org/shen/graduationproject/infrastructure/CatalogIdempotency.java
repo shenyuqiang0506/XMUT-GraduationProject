@@ -14,7 +14,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor
 public class CatalogIdempotency {
     public record Result(int status, Object data, boolean replayed) {

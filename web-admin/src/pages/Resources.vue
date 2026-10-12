@@ -11,6 +11,7 @@ const filters = ref({campus: '', building: '', type: '', dataMode: '', capacityM
     editing = ref<Resource | null>(null), saving = ref(false), detail = ref<Resource | null>(null),
     groupDialog = ref(false), groupName = ref(''), membersGroup = ref(''), members = ref<string[]>([]),
     managers = ref<User[]>([])
+// 日常业务默认使用真实来源；测试资料必须显式选择隔离模式。
 const blank = () => ({
   resourceType: 'VENUE',
   sourceSystem: 'MANUAL',
@@ -27,7 +28,7 @@ const blank = () => ({
   sourceBorrowable: 'UNKNOWN',
   platformStatus: 'DRAFT',
   approvalGroupId: null as string | null,
-  dataMode: 'DEMO',
+  dataMode: 'REAL',
   remark: '',
   features: {} as Record<string, string>,
   assetCode: '',

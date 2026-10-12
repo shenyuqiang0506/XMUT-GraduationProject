@@ -29,7 +29,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration(proxyBeanMethods = false)
-@Profile("business & !m1")
+@Profile("business")
 public class BusinessSecurity {
     @Bean
     JwtDecoder businessJwtDecoder(@Value("${JWT_PUBLIC_KEY_PATH}") String keyPath,

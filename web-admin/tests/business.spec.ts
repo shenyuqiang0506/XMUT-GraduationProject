@@ -43,6 +43,9 @@ test('administrator: real login, one concurrent refresh, resource CRUD, users, i
     await expect.poll(() => refreshes).toBe(1)
     await page.getByRole('button', {name: '新增资源', exact: true}).click()
     const dialog = page.getByRole('dialog', {name: '新增资源'})
+    await expect(dialog.getByText('真实 REAL', {exact: true})).toBeVisible()
+    await dialog.getByLabel('数据模式', {exact: true}).press('ArrowDown');
+    await page.getByRole('option', {name: '演示 DEMO', exact: true}).click();
     await dialog.getByLabel('资源名称', {exact: true}).fill(prefix + ' Web resource')
     await dialog.getByLabel('来源系统', {exact: true}).fill(required('TEST_SOURCE'))
     await dialog.getByLabel('来源编号（保留前导零）', {exact: true}).fill('web0001')
@@ -67,6 +70,9 @@ test('administrator: real login, one concurrent refresh, resource CRUD, users, i
     await expect(create).not.toBeVisible();
     await expect(page.getByRole('row').filter({hasText: prefix + '_web'})).toContainText('学生')
     await page.getByRole('menuitem', {name: '资料导入'}).click();
+    await expect(page.locator('#app').getByText('真实来源 REAL', {exact: true})).toBeVisible()
+    await page.getByLabel('数据模式', {exact: true}).press('ArrowDown');
+    await page.getByRole('option', {name: '演示资料 DEMO', exact: true}).click();
     await page.getByLabel('来源系统', {exact: true}).fill(required('TEST_SOURCE'))
     await page.getByTestId('import-file').setInputFiles({
         name: 'browser.json',

@@ -69,34 +69,13 @@ java -jar GraduationProject/target/GraduationProject-0.0.1-SNAPSHOT.jar
 
 `InfrastructureIT` 默认不执行，需要 `verify-dev.sh` 设置 `XMUT_INFRA_TEST=true`；该脚本固定为 dev，不对 prod 执行业务写入测试。普通 `mvn verify` 执行不依赖 Docker 的 12 项测试，包含工具与时间窗口边界验证。
 
-## M1 后端调用链与 AI 验证
+## AI 配置与历史验证
 
-```sh
-# 先执行根目录 Maven verify，准备四个可运行 jar。
-./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp verify
-python3 deployment/scripts/init-m1.py
-python3 deployment/scripts/bootstrap-nacos.py dev
-# 无外部模型费用：本机 OpenAI 兼容协议模拟器。
-python3 deployment/scripts/m1-smoke.py
-# 真实服务：读取已被忽略的 deployment/.env.ai，可能产生模型费用。
-python3 deployment/scripts/m1-smoke.py --real-model
-```
+AI 服务保留 Spring AI 依赖、模型配置与身份接入骨架，正式 AI 查询业务待实现。旧演示接口、Basic 认证、`m1` profile、凭据生成器及专用冒烟脚本已于 2026-10-12 移除；不再生成或加载演示账号。
 
-`deployment/.env.ai` 使用如下变量（填写真实值到本机文件，权限 600）：
+已有 `deployment/.env.ai` 继续作为本机私密配置保留，包含 `AI_BASE_URL`、`AI_MODEL`、`AI_API_KEY`，权限 600 且 Git 忽略。不要将真实密钥写入公开文件。历史调用结果保存在 `开发文档/docs/verification/2026-10-11/m1/`，只说明当时通过了技术验证，不是现行操作指令。
 
-```dotenv
-AI_BASE_URL=https://api.deepseek.com
-AI_MODEL=deepseek-flash
-AI_API_KEY=replace-with-model-api-key
-```
-
-验证器会自动读取 `secrets/dev/backend.env`、`secrets/dev/m1.env`，为四个 Java 进程启用 `dev,m1`，为 AI 额外启用 `ai`；8081–8084 被占用时会退出，避免停止已有程序。开发凭据只保存一次，生成器不覆盖已有文件；它与 Nacos 管理员密码及模型 API key 是三套不同凭据。
-
-调用链：网关 `/api/v1/m1/booking/status` → booking → identity；网关 POST `/api/v1/m1/ai/query` → Spring AI → `getResourceDetails` → booking → 模型回复。工具只读 `demo-venue-1`，数据标记 `DEMO`，可用状态 `UNKNOWN`，不会创建预约。所有内部端点使用 `/internal/m1/`，不是 04 文档的正式业务 API。
-
-模拟器覆盖错误密码、未认证直连、非法 traceId、空输入、模型失败/超时、缺少工具、非法工具参数及重复工具调用；真实模式验证真实模型的工具往返。每次工具上限 2，模型 SDK 重试关闭，默认单次模型请求超时 15 秒；模拟超时用 1 秒。M1 Basic 认证仅用于本机技术验证，生产会拒绝该 profile。
-
-运行日志保存在被忽略的 `secrets/dev/m1-stub-logs/`、`m1-real-logs/`；公开结果只保存无密钥的检查摘要到 `开发文档/docs/verification/2026-10-11/m1/`。完成后验证器关闭自己启动的 Java 进程，Docker dev 保持运行。
+正式业务通过 `dev,business` 启动并使用 JWT 认证。回归执行 `auth-smoke.py`、`catalog-smoke.py` 与 `availability-smoke.py`；新报告按上海日期写入 `开发文档/docs/verification/<日期>/business/`，不覆盖历史阶段记录。
 
 ## 停止、重启与数据
 
@@ -177,6 +156,6 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/catalog-smoke.py
 XMUT_WEB_TEST=1 python3 deployment/scripts/availability-smoke.py
 ```
 
-脚本使用真实 MySQL / Redis / Nacos，临时创建自己的来源、资源、账号和明确标记的测试策略，检查覆盖、开放、占用、组合与事务回滚；结束后清理本轮资料，恢复原生效策略并停止自己启动的进程。公开结果位于 `开发文档/docs/verification/2026-10-11/m3/`，私密日志不进 Git。
+脚本使用真实 MySQL / Redis / Nacos，临时创建自己的来源、资源、账号和明确标记的测试策略，检查覆盖、开放、占用、组合与事务回滚；结束后清理本轮资料，恢复原生效策略并停止自己启动的进程。新执行的公开结果位于 `开发文档/docs/verification/<日期>/business/`，原阶段证据保留在 `2026-10-11/m3/`，私密日志不进 Git。
 
-M3 的 Flyway V2 已在本机 dev 执行，不得重新排版；以后结构变更新增迁移。新环境策略为空，需系统管理员依据已确认制度显式配置 REAL，DEMO 草案只供演示。联合申请 / 审批 / 取消尚待下一步，当前查询不创建暂占。详细字段、接口与恢复说明见 [M3 可用性基础验收](../开发文档/docs/development/14-M3可用性基础验收.md)。
+M3 的 Flyway V2 已在本机 dev 执行，不得重新排版；以后结构变更新增迁移。新环境策略为空，需系统管理员依据已确认制度显式配置 REAL，页面默认 REAL，规则缺失时留空并由管理员依据制度填写。联合申请 / 审批 / 取消尚待下一步，当前查询不创建暂占。详细字段、接口与恢复说明见 [M3 可用性基础验收](../开发文档/docs/development/14-M3可用性基础验收.md)。

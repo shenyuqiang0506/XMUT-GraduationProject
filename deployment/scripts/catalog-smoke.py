@@ -170,8 +170,8 @@ def main():
                     result=subprocess.run(['npm','test'],cwd=s.REPO/'web-admin',env=env,stdout=log,stderr=subprocess.STDOUT)
                 assert result.returncode==0,'Web acceptance failed; inspect private web-test.log (redact credentials before output).'
                 record('Real browser acceptance: login, role routes, resource mutation, preview/commit, one refresh for concurrent 401s')
-            destination=s.REPO/'开发文档/docs/verification/2026-10-11/m2';destination.mkdir(parents=True,exist_ok=True)
-            (destination/'catalog-import.json').write_text(json.dumps({'date':'2026-10-11','mode':'dev-business-real-infrastructure','checks':checks,'passed':len(checks),'failed':0,'scope':'M2 resource catalog only; availability/occupancy/booking are not asserted'},ensure_ascii=False,indent=2)+'\n')
+            destination=s.auth.REPORT_DIR;destination.mkdir(parents=True,exist_ok=True)
+            (destination/'catalog-import.json').write_text(json.dumps({'date':s.auth.REPORT_DATE,'mode':'dev-business-real-infrastructure','checks':checks,'passed':len(checks),'failed':0,'scope':'M2 resource catalog only; availability/occupancy/booking are not asserted'},ensure_ascii=False,indent=2)+'\n')
     finally:
         try:
             files=s.sql("SELECT file_storage_key FROM import_batch WHERE source_system='"+source+"';").splitlines()

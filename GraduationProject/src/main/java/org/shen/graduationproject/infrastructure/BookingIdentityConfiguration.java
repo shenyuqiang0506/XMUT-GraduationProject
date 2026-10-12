@@ -5,7 +5,7 @@ import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.context.annotation.*;
 
 @Configuration(proxyBeanMethods = false)
-@Profile("business & !m1")
+@Profile("business")
 class BookingIdentityConfiguration {
     @Bean
     IdentityLookup bookingIdentityLookup(DiscoveryClient discovery) {

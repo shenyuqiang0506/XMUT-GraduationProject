@@ -236,8 +236,8 @@ def main():
                     result=subprocess.run(['npm','test','--','tests/availability.spec.ts'],cwd=s.REPO/'web-admin',env=env,stdout=log,stderr=subprocess.STDOUT)
                 assert result.returncode==0,'可用性浏览器验收失败，请检查私密 availability-web-test.log'
                 record('真实浏览器：学生查询与日历、路由保护、规则策略保存及来源时间导入')
-            destination=s.REPO/'开发文档/docs/verification/2026-10-11/m3';destination.mkdir(parents=True,exist_ok=True)
-            (destination/'availability.json').write_text(json.dumps({'date':'2026-10-11','mode':'dev-real-mysql-redis-nacos','checks':checks,'passed':len(checks),'failed':0,'scope':'M3 可用性基础；不含申请、审批、候补及线上部署'},ensure_ascii=False,indent=2)+'\n')
+            destination=s.auth.REPORT_DIR;destination.mkdir(parents=True,exist_ok=True)
+            (destination/'availability.json').write_text(json.dumps({'date':s.auth.REPORT_DATE,'mode':'dev-real-mysql-redis-nacos','checks':checks,'passed':len(checks),'failed':0,'scope':'M3 可用性基础；不含申请、审批、候补及线上部署'},ensure_ascii=False,indent=2)+'\n')
     finally:
         # 按外键依赖逆序清理，只处理本轮随机来源，不删除管理员和迁移记录。
         files=s.sql("SELECT file_storage_key FROM import_batch WHERE source_system='"+source+"'").splitlines()

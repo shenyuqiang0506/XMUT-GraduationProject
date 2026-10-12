@@ -4,7 +4,8 @@ import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
 import type {ImportBatch, Group, Resource, Page} from '../types'
 
-const file = ref<File | null>(null), source = ref('CAMPUS_CATALOG'), mode = ref('DEMO'), group = ref(''),
+// 日常业务默认使用真实来源；测试资料必须显式选择隔离模式。
+const file = ref<File | null>(null), source = ref('CAMPUS_CATALOG'), mode = ref('REAL'), group = ref(''),
     mapping = ref('{}'), context = ref('{}'), batch = ref<ImportBatch | null>(null), busy = ref(false), error = ref(''),
     groups = ref<Group[]>([]), keys = mutationKeys()
 const kind = ref('RESOURCE_CATALOG'), resources = ref<Resource[]>([]), resourceIds = ref<string[]>([])

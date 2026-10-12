@@ -10,7 +10,7 @@
     </parent>
     <artifactId>GraduationProject</artifactId>
     <name>booking-service</name>
-    <description>Booking service foundation and M1 technical probes</description>
+    <description>校园资源预约：资源目录与预约业务服务</description>
     <dependencies>
         <dependency>
             <groupId>org.shen</groupId>

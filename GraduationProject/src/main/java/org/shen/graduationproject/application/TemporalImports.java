@@ -16,7 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor
 public class TemporalImports {
     private final JdbcTemplate sql;

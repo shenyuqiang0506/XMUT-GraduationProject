@@ -2,7 +2,7 @@ import {test,expect,type Page} from '@playwright/test'
 
 // Playwright 在 Node.js 中执行；独立测试配置提供 process.env 与 Buffer 类型。
 test.use({timezoneId:'Asia/Shanghai'})
-test.skip(!process.env.TEST_AVAILABILITY_START,'由 availability-smoke.py 创建独立真实数据后执行')
+test.skip(!process.env.TEST_AVAILABILITY_START,'由 availability-smoke.py 创建独立测试资料后执行')
 // 浏览器测试结束后退出各自会话，不留下管理员登录状态。
 test.afterEach(async({page})=>{
  const exit=page.getByRole('button',{name:'退出登录',exact:true})
@@ -21,6 +21,9 @@ test('学生真实查询同组组合、查看日历且不能访问管理页',asy
  await login(page,required('TEST_AVAILABILITY_STUDENT'),required('TEST_AVAILABILITY_PASSWORD'))
  await expect(page.getByRole('menuitem',{name:'开放与占用管理'})).toHaveCount(0)
  await page.getByRole('menuitem',{name:'可用时段查询'}).click()
+ await expect(page.locator('#app').getByText('真实 REAL', {exact: true})).toBeVisible()
+ await page.getByLabel('数据模式',{exact:true}).press('ArrowDown')
+ await page.getByRole('option',{name:'演示 DEMO',exact:true}).click()
  await page.getByLabel('开始时间',{exact:true}).fill(required('TEST_AVAILABILITY_START'))
  await page.getByLabel('开始时间',{exact:true}).press('Tab')
  await page.getByLabel('结束时间',{exact:true}).fill(required('TEST_AVAILABILITY_END'))
@@ -38,6 +41,9 @@ test('学生真实查询同组组合、查看日历且不能访问管理页',asy
 test('管理员保存开放规则与策略，切换真实策略不沿用演示草案',async({page})=>{
  await login(page,required('TEST_ADMIN_USERNAME'),required('TEST_ADMIN_PASSWORD'))
  await page.getByRole('menuitem',{name:'开放与占用管理'}).click()
+ await expect(page.locator('#app').getByText('真实 REAL', {exact: true})).toBeVisible()
+ await page.getByLabel('策略范围',{exact:true}).press('ArrowDown')
+ await page.getByRole('option',{name:'演示 DEMO',exact:true}).click()
  await page.getByLabel('选择资源',{exact:true}).click()
  await page.getByRole('option',{name:required('TEST_AVAILABILITY_VENUE')+' · DEMO',exact:true}).click()
  await page.getByRole('button',{name:'保存开放规则',exact:true}).click()
@@ -54,6 +60,9 @@ test('管理员保存开放规则与策略，切换真实策略不沿用演示�
 test('管理员核对完整时间快照并确认，修改来源说明后需重新预览',async({page})=>{
  await login(page,required('TEST_ADMIN_USERNAME'),required('TEST_ADMIN_PASSWORD'))
  await page.getByRole('menuitem',{name:'资料导入'}).click()
+ await expect(page.locator('#app').getByText('真实来源 REAL', {exact: true})).toBeVisible()
+ await page.getByLabel('数据模式',{exact:true}).press('ArrowDown')
+ await page.getByRole('option',{name:'演示资料 DEMO',exact:true}).click()
  await page.getByLabel('导入内容',{exact:true}).press('ArrowDown')
  await page.getByRole('option',{name:'来源占用快照',exact:true}).click()
  await page.getByLabel('来源系统',{exact:true}).fill(required('TEST_AVAILABILITY_SOURCE'))

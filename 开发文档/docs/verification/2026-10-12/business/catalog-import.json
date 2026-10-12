@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-12",
+  "mode": "dev-business-real-infrastructure",
+  "checks": [
+    {
+      "check": "Booking Flyway migration, distinct database, approval-group membership validated against live identity",
+      "result": "PASS"
+    },
+    {
+      "check": "String IDs/unknown capacity preserved; create replay; student visibility; manager scope and REAL opening constraints",
+      "result": "PASS"
+    },
+    {
+      "check": "Optimistic version conflict and immutable source fields; invalid resource manager rejected",
+      "result": "PASS"
+    },
+    {
+      "check": "Equipment asset uniqueness rolls back the new resource without altering its owner",
+      "result": "PASS"
+    },
+    {
+      "check": "JSON uses actual 3 rows rather than totalResult=1132; preview/commit replay; raw sensitive fields excluded; default DRAFT",
+      "result": "PASS"
+    },
+    {
+      "check": "Repeat import updates existing source IDs with version increments; no duplicates or resource deletion",
+      "result": "PASS"
+    },
+    {
+      "check": "Conflicting IDs, negative capacity, missing name and duplicate rows block commit without partial writes",
+      "result": "PASS"
+    },
+    {
+      "check": "Explicit mapping resolves source ID ambiguity; sensitive-column mapping rejected",
+      "result": "PASS"
+    },
+    {
+      "check": "Actual XLSX parses Chinese headers, leading-zero IDs and unknown capacity correctly",
+      "result": "PASS"
+    },
+    {
+      "check": "REAL/DEMO filtering and real-source NO update closes previously OPEN catalog entry",
+      "result": "PASS"
+    },
+    {
+      "check": "Changed saved file hash blocks commit; client has no server storage path",
+      "result": "PASS"
+    },
+    {
+      "check": "Commit rechecks current group scope and rolls back after authority removal",
+      "result": "PASS"
+    },
+    {
+      "check": "File type/size/JSON format/import stage and list parameter limits enforced",
+      "result": "PASS"
+    },
+    {
+      "check": "Real browser acceptance: login, role routes, resource mutation, preview/commit, one refresh for concurrent 401s",
+      "result": "PASS"
+    }
+  ],
+  "passed": 14,
+  "failed": 0,
+  "scope": "M2 resource catalog only; availability/occupancy/booking are not asserted"
+}

@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor
 public class ResourceCatalog {
     private final JdbcTemplate sql;

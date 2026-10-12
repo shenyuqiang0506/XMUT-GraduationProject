@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class CatalogController {
     private final ResourceCatalog resources;

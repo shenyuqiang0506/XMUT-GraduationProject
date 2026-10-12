@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
-@Profile("business & !m1")
+@Profile("business")
 public class AuthenticationService implements IdentityLookup {
     private final IdentityRepository repo;
     private final PasswordEncoder passwords;

@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 @Component
-@Profile("business & !m1")
+@Profile("business")
 public class ImportStorage {
     public record Saved(String key, String filename, String hash) {
     }

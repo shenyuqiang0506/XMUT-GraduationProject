@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-12",
+  "scope": "演示接口退役与真实数据默认配置，不包含后续预约业务",
+  "mavenCleanVerify": "PASS",
+  "javaTests": 12,
+  "webTypeCheckAndBuild": "PASS",
+  "packagedArtifactsContainNoDemoClasses": "PASS",
+  "authenticationChecks": 16,
+  "catalogBackendChecks": 13,
+  "availabilityBackendChecks": 14,
+  "browserScenariosPassed": 6,
+  "migrationFilesChanged": false,
+  "productionDeployment": false
+}

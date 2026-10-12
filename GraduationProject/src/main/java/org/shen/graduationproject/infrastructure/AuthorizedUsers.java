@@ -17,7 +17,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 @Component
-@Profile("business & !m1")
+@Profile("business")
 public class AuthorizedUsers {
     private final DiscoveryClient discovery;
     private final RestClient http;

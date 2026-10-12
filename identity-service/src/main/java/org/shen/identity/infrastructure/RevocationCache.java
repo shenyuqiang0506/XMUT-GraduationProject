@@ -10,7 +10,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Component
-@Profile("business & !m1")
+@Profile("business")
 public class RevocationCache {
     private final StringRedisTemplate redis;
     private final String prefix;

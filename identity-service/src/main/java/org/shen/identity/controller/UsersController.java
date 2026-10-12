@@ -14,7 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@Profile("business & !m1")
+@Profile("business")
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class UsersController {
     private final UserAdministration users;

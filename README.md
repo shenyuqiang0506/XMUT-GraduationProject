@@ -8,7 +8,7 @@
 
 - `GraduationProject/`：booking-service，保留原目录和制品名；正式资源目录、导入、可用性、开放占用管理、审批组与管理范围。
 - `identity-service/`：本地账号、BCrypt、JWT/刷新会话、角色与账号启停。
-- `ai-service/`：Spring AI 模型适配，M1 只读工具与 Feign 演示验证；正式 AI 在 M5 实现。
+- `ai-service/`：保留 Spring AI 依赖、模型配置和身份接入骨架；演示接口已移除，正式 AI 业务待实现。
 - `gateway/`：WebFlux 网关、JWT 校验和 Nacos/LoadBalancer 路由。
 - `common-contracts/`：统一响应、身份与 traceId 契约。
 - `security-core/`：共享 RSA 密钥读取与 JWT 校验，不向网关引入 MVC/JDBC。
@@ -60,7 +60,7 @@ python3 deployment/scripts/prepare-idea.py
 
 ## M2 本机运行
 
-本机私密文件已生成，正式管理员账号与原始密码在 `deployment/secrets/dev/business-accounts.md`；这与 Nacos、M1 验证账号不同。新电脑先按部署说明生成文件、启动 Docker dev，再执行：
+本机私密文件已生成，正式管理员账号与原始密码在 `deployment/secrets/dev/business-accounts.md`；这与 Nacos 管理账号不同。新电脑先按部署说明生成文件、启动 Docker dev，再执行：
 
 ```sh
 # 根目录：构建 Java 七模块。
@@ -90,7 +90,7 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/catalog-smoke.py
 
 ## M3 可用性基础
 
-Web 新增“可用时段查询”“开放与占用管理”；资料导入支持来源占用快照和已确认空闲区间。新环境不会自动启用规则：系统管理员先分别配置 DEMO / REAL 参数与依据，再维护开放时段并导入已核实的覆盖。真实制度未确认前只使用标明假设的 DEMO 资料。
+Web 新增“可用时段查询”“开放与占用管理”；资料导入支持来源占用快照和已确认空闲区间。新环境不会自动启用规则：系统管理员先配置 REAL 参数与制度依据，再维护开放时段并导入已核实的覆盖。页面新增、导入、查询与策略默认 REAL，不预填演示规则。用户后续提供的数据集均按真实来源处理；真实目录不自动证明占用覆盖完整或资源可预约。DEMO 标记仅保留用于隔离自动化测试资料和识别既有演示记录，不将其转换为真实资料。
 
 ```sh
 XMUT_WEB_TEST=1 python3 deployment/scripts/availability-smoke.py
@@ -107,14 +107,17 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/availability-smoke.py
 可选 Spring profiles：
 
 - `dev` / `prod`：对应环境标记和 Nacos；Data ID 使用服务的 `spring.application.name`。
-- `business`：正式 M2 API，加载对应环境的 JWT、数据库配置；不要与 `m1` 组合。
+- `business`：正式业务 API，加载对应环境的 JWT、数据库配置。
 - `bootstrap-admin`：仅 dev/test 身份服务初始化空库管理员，已有账号不覆盖；prod 禁止。
-- `m1`：仅允许 dev/test，开发 Basic 认证与 DEMO 数据；拒绝 prod。
-- `ai`：仅在 ai-service 启用模型，需要私密 AI_BASE_URL、AI_MODEL、AI_API_KEY；调用可能产生费用。
+- `ai`：仅在 ai-service 加载模型配置，需要私密 AI_BASE_URL、AI_MODEL、AI_API_KEY；当前没有对外 AI 查询接口。
 
 自动验证使用独立 Nacos 注册 group，完成后停止自己创建的 Java 进程，Docker dev 继续运行。Actuator 仅暴露 health/info。prod 已准备独立配置与凭据，尚未部署。
 
+2026-10-12 已移除旧演示控制器、路由、Basic 认证、`m1` profile 和专用验证脚本。历史 M1 记录保留为当时的技术验证证据，不代表当前仍提供这些接口。
+
 ## 验证记录
+
+- [演示接口下线与真实数据约定](开发文档/docs/development/15-演示接口下线与真实数据约定.md)
 
 - [依赖验证记录](开发文档/docs/development/09-依赖验证记录.md)
 - [Docker 环境验证](开发文档/docs/development/10-Docker环境验证记录.md)

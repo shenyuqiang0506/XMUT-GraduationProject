@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-12",
+  "stats": {
+    "startTime": "2026-10-12T11:29:17.237Z",
+    "duration": 7518.554,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "scope": "可用性页面、默认 REAL 策略与来源时间导入"
+}

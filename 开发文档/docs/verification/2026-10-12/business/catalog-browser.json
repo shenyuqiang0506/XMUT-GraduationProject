@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-12",
+  "stats": {
+    "startTime": "2026-10-12T11:28:34.727Z",
+    "duration": 8214.282,
+    "expected": 3,
+    "skipped": 3,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "scope": "目录、身份页面及真实数据默认选择；可用性场景由独立脚本执行"
+}

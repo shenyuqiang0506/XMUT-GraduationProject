@@ -6,6 +6,10 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+/**
+ * 身份模块的密码编码配置。
+ * BCrypt 工作因子为 12；数据库保存不可逆的密码摘要，登录时通过 matches 校验。
+ */
 @Configuration(proxyBeanMethods = false)
 @Profile("business")
 class IdentityConfiguration {

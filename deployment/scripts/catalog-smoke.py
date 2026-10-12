@@ -17,6 +17,7 @@ spec=importlib.util.spec_from_file_location('support',Path(__file__).with_name('
 s=importlib.util.module_from_spec(spec);spec.loader.exec_module(s)
 BASE='http://127.0.0.1:8081/api/v1'
 
+# 构造最小有效 XLSX 测试文件，显式保留文本单元格，验证来源编号前导零。
 def xlsx(rows):
     parts={'[Content_Types].xml':'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
         '_rels/.rels':'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
@@ -32,6 +33,7 @@ def xlsx(rows):
         for path,text in parts.items():archive.writestr(path,text.encode())
     return out.getvalue()
 
+# 构造 multipart 导入请求；默认 DEMO 明确标记测试资料，避免混入正式数据。
 def upload(prefix,token,source,payload,group=None,key=None,mapping=None,filename='catalog.json',mode='DEMO',kind='RESOURCE_CATALOG'):
     boundary=uuid.uuid4().hex;chunks=[]
     fields={'importType':kind,'sourceSystem':source,'dataMode':mode,'fieldMapping':json.dumps(mapping or {}),'queryContext':json.dumps({'approvalGroupId':group,'capturedAt':'2026-10-11T00:00:00Z','sourceDescription':'DEMO verification fixture'} if group else {})}
@@ -43,6 +45,8 @@ def upload(prefix,token,source,payload,group=None,key=None,mapping=None,filename
     except urllib.error.HTTPError as e:r=e
     with r:return r.status,json.load(r),dict(r.headers)
 
+# 通过真实数据库和网关验证目录、权限、导入及幂等行为。
+# 使用独立来源标识定位本轮数据；可按环境开关追加浏览器验收。
 def main():
     prefix='cat-'+uuid.uuid4().hex[:10];source=prefix.replace('-','_');checks=[]
     password=uuid.uuid4().hex+'Aa1!';private=s.runtime.load_env(s.PRIVATE/'identity.env');storage=Path(s.runtime.load_env(s.PRIVATE/'auth.env')['IMPORT_STORAGE_DIR'])

@@ -16,6 +16,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+/**
+ * 身份库的 JDBC 访问层，集中处理账号、角色、设备会话和审计记录。
+ * 带 lock 的查询可追加 FOR UPDATE，调用方必须在事务中使用才能保持行锁。
+ * 本层按需组合 SQL；业务权限、事务范围与并发顺序由应用服务决定。
+ */
 @Repository
 @Profile("business")
 @RequiredArgsConstructor
@@ -56,12 +61,18 @@ public class IdentityRepository {
         return sql.query("SELECT * FROM user_session WHERE id=?" + (lock ? " FOR UPDATE" : ""), SESSION, id).stream().findFirst().orElse(null);
     }
 
+    /**
+     * 先查当前刷新摘要，再查已使用的历史摘要；历史命中用于识别重放，不能直接签发新令牌。
+     */
     public Session findRefresh(String hash) {
         var current = sql.query("SELECT * FROM user_session WHERE refresh_token_hash=?", SESSION, hash);
         if (!current.isEmpty()) return current.getFirst();
         return sql.query("SELECT s.* FROM used_refresh_token t JOIN user_session s ON s.id=t.session_id WHERE t.token_hash=?", SESSION, hash).stream().findFirst().orElse(null);
     }
 
+    /**
+     * 在调用方事务内创建账号及角色。LAST_INSERT_ID 依赖同一 JDBC 事务连接，不能拆成异步查询。
+     */
     public long createUser(String username, String hash, String name, Set<String> roles) {
         sql.update("INSERT INTO `user`(username,password_hash,display_name,status,auth_version) VALUES (?,?,?,'ACTIVE',0)", username, hash, name);
         long id = sql.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
@@ -69,6 +80,9 @@ public class IdentityRepository {
         return id;
     }
 
+    /**
+     * 整体替换角色集合；任一角色不存在即抛错，由外层事务回滚删除和已插入记录。
+     */
     public void setRoles(long id, Set<String> roles) {
         sql.update("DELETE FROM user_role WHERE user_id=?", id);
         for (String role : roles) {

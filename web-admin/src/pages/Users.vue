@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/**
+ * 系统管理员账号管理页面：创建账号、调整角色、启用或停用。
+ * 修改请求携带身份版本与幂等键；后端拒绝最后管理员被停用或降权。
+ */
 import {ref, onMounted} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
@@ -10,6 +14,7 @@ const rows = ref<User[]>([]), page = ref(1), total = ref(0), username = ref(''),
 const form = ref({username: '', displayName: '', initialPassword: '', roleCodes: ['STUDENT'] as Role[]}),
     names: Record<Role, string> = {SYSTEM_ADMIN: '系统管理员', RESOURCE_ADMIN: '资源管理员', STUDENT: '学生'}
 
+// 按当前页和账号筛选重新读取列表；失败保留错误提示，并在 finally 结束加载状态。
 async function load() {
   busy.value = true;
   error.value = '';
@@ -30,6 +35,7 @@ async function load() {
 
 onMounted(load)
 
+// 角色先排序，确保相同集合产生稳定请求内容；成功后清理初始密码并重新查询列表。
 async function create() {
   saving.value = true;
   const payload = {...form.value, roleCodes: [...form.value.roleCodes].sort()};
@@ -47,17 +53,20 @@ async function create() {
   }
 }
 
+// 每次创建都生成全新表单，避免沿用上次账号、密码或角色选择。
 function open() {
   form.value = {username: '', displayName: '', initialPassword: '', roleCodes: ['STUDENT']};
   dialog.value = true
 }
 
+// 复制角色集合到编辑状态，确认前不直接修改列表中的服务器快照。
 function editRoles(row: User) {
   target.value = row;
   roles.value = [...row.roles];
   roleDialog.value = true
 }
 
+// 带读取时的 authVersion 提交；并发变更会由后端拒绝，成功后旧会话立即失效。
 async function changeRoles() {
   if (!target.value) return;
   const payload = {roleCodes: [...roles.value].sort(), expectedVersion: target.value.authVersion},
@@ -76,6 +85,7 @@ async function changeRoles() {
   }
 }
 
+// 提交启停目标状态及预期版本，不在前端猜测最后管理员约束是否允许。
 async function changeStatus(row: User) {
   const payload = {status: row.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE', expectedVersion: row.authVersion},
       path = '/users/' + row.id + '/status';

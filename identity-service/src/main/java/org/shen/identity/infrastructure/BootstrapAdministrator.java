@@ -12,6 +12,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/**
+ * 开发与测试空库的首次管理员初始化。
+ * 显式启用 bootstrap-admin 才运行；拒绝 prod，也不覆盖非空库的账号或密码。
+ * 初始化与普通账号管理共用守卫行，避免多个实例同时创建管理员。
+ */
 @Component
 @Profile("bootstrap-admin & business")
 class BootstrapAdministrator implements ApplicationRunner {

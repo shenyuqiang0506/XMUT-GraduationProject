@@ -1,3 +1,5 @@
+// 可用性页面验收：由 availability-smoke.py 提供资源、时间范围和临时账号。
+// 固定上海时区，保证浏览器表单时间与后端业务日期解释一致。
 import {test,expect,type Page} from '@playwright/test'
 
 // Playwright 在 Node.js 中执行；独立测试配置提供 process.env 与 Buffer 类型。

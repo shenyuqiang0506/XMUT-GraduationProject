@@ -12,6 +12,9 @@ import org.shen.platform.support.BusinessException;
 public record TimeWindow(Instant start, Instant end) {
     public static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
 
+    /**
+     * 构造时统一约束非空、正长度及毫秒精度，所有导入和查询共用同一时间边界。
+     */
     public TimeWindow {
         if (start == null || end == null || !start.isBefore(end)
                 || start.getNano() % 1000000 != 0 || end.getNano() % 1000000 != 0)
@@ -24,10 +27,16 @@ public record TimeWindow(Instant start, Instant end) {
         return new TimeWindow(start.toInstant(), end.toInstant());
     }
 
+    /**
+     * 包含允许两端相等；用于确认来源行是否完全位于声明窗口内。
+     */
     public boolean contains(TimeWindow other) {
         return !other.start.isBefore(start) && !other.end.isAfter(end);
     }
 
+    /**
+     * 严格比较两端，保证 09:00–10:00 与 10:00–11:00 不被判作相交。
+     */
     public boolean overlaps(TimeWindow other) {
         return start.isBefore(other.end) && end.isAfter(other.start);
     }
@@ -37,6 +46,9 @@ public record TimeWindow(Instant start, Instant end) {
             throw new BusinessException(400, "TIME_RANGE_INVALID", "查询或导入范围过大");
     }
 
+    /**
+     * 以业务时区判断自然日；结束恰好为次日零点也会跨日，因此当前规则会拒绝。
+     */
     public void singleDay() {
         if (!start.atZone(ZONE).toLocalDate().equals(end.atZone(ZONE).toLocalDate()))
             throw new BusinessException(400, "TIME_RANGE_INVALID", "一期预约不支持跨上海自然日");
@@ -50,6 +62,7 @@ public record TimeWindow(Instant start, Instant end) {
      * 合并相接的证据区间；任何一个空隙都不能推断成完整覆盖。
      */
     public static boolean covered(TimeWindow target, List<TimeWindow> intervals) {
+        // 游标表示已经连续证明到的位置。已落在游标之前的区间可跳过，出现缺口立即判不完整。
         Instant cursor = target.start;
         for (var interval : intervals.stream().sorted(Comparator.comparing(TimeWindow::start)).toList()) {
             if (!interval.end.isAfter(cursor)) continue;

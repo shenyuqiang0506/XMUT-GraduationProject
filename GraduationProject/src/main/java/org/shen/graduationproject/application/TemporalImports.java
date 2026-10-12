@@ -15,6 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * 来源占用与已确认空闲区间的导入应用服务。
+ * 完整快照必须声明资源、时间窗口、采集时间与来源依据；部分数据不能证明空闲。
+ * 确认事务按资源 ID 升序锁定，再更新占用、覆盖、批次和审计，避免资源间出现半批成功。
+ */
 @Service
 @Profile("business")
 @RequiredArgsConstructor
@@ -28,9 +33,15 @@ public class TemporalImports {
     private final BookingPolicies policies;
     private final ObjectMapper json;
 
+    /**
+     * 解析行绑定到平台资源 ID 后的内部结构，后续写入不再以用户可变名称定位资源。
+     */
     private record Bound(long resource, TemporalFileParser.Entry entry) {
     }
 
+    /**
+     * 本次来源证据的声明范围；有序资源集合同时用于稳定锁顺序。
+     */
     private record Context(TimeWindow window, Instant captured, String completeness, SortedSet<Long> resources) {
     }
 
@@ -81,6 +92,10 @@ public class TemporalImports {
         return result;
     }
 
+    /**
+     * 共同用于预览和确认的完整校验流程：绑定来源资源、验证权限、核对范围与采集时间。
+     * 行错误保留原行号；不完整的上下文直接拒绝，不能据此生成完整覆盖。
+     */
     private Prepared prepare(AuthActor actor, byte[] bytes, String file, String type, String source, String mode,
                              Map<String, String> mapping, Map<String, Object> context) {
         var parsed = parser.parse(bytes, file, type, mapping);
@@ -100,6 +115,7 @@ public class TemporalImports {
         }
         if (!Set.of("from", "to", "capturedAt", "completeness", "sourceDescription", "resourceIds", "queryDate", "periods").containsAll(context.keySet()))
             throw new BusinessException(400, "VALIDATION_ERROR", "占用查询条件包含未知字段");
+        // COMPLETE 必须由来源明确声明，不能因为文件没有占用行就自动判定完整。
         boolean complete = "COMPLETE".equals(context.get("completeness"));
         if (context.containsKey("completeness") && !(context.get("completeness") instanceof String value && Set.of("COMPLETE", "PARTIAL").contains(value)))
             throw new BusinessException(400, "VALIDATION_ERROR", "覆盖完整性需要 COMPLETE 或 PARTIAL");
@@ -115,6 +131,7 @@ public class TemporalImports {
                 throw new BusinessException(400, "VALIDATION_ERROR", "文件资源超出声明范围");
             ids.addAll(declared);
         }
+        // 用数据库时钟判断采集时间是否在未来；证据允许过期保存，但查询时会根据策略判为未知。
         Instant now = policies.now();
         TimeWindow window;
         Instant captured;
@@ -139,6 +156,7 @@ public class TemporalImports {
         for (var row : rows)
             if (!window.contains(row.entry().window()))
                 errors.add(new CatalogFileParser.Error(row.entry().rowNumber(), "interval", "OUTSIDE_COVERAGE", "时间行超出声明范围"));
+        // 只有声明完整资源范围的占用快照才可以是空文件；空文件并不表示全库或全校空闲。
         if (ids.isEmpty() || ids.size() > 100 || (parsed.sourceRows() == 0 && !complete))
             throw new BusinessException(400, "VALIDATION_ERROR", "空占用文件只能用于有明确资源和时间范围的完整快照");
         for (long id : ids) {
@@ -150,6 +168,9 @@ public class TemporalImports {
         return new Prepared(parsed, rows, new Context(window, captured, complete ? "COMPLETE" : "PARTIAL", ids), errors);
     }
 
+    /**
+     * 保存并预览来源时间文件，展示涉及资源和逐行错误；数据库占用及覆盖在确认前不变化。
+     */
     public CatalogIdempotency.Result preview(AuthActor actor, String key, MultipartFile file, String type, String source,
                                              String mode, String mappingText, String contextText) {
         access.administrator(actor);
@@ -191,6 +212,9 @@ public class TemporalImports {
         }
     }
 
+    /**
+     * 拒绝同资源、同来源的迟到快照；此处保守比较全部历史采集时间，而非仅比较重叠窗口。
+     */
     private void fresh(long resource, String source, Instant captured) {
         // 同来源的新记录（包括已停用记录）不能被迟到的旧快照重新覆盖。
         long newer = sql.queryForObject("SELECT (SELECT COUNT(*) FROM availability_coverage WHERE resource_id=? AND source_system=? AND checked_at>?) + (SELECT COUNT(*) FROM external_occupancy WHERE resource_id=? AND source_system=? AND observed_at>?)", Long.class,
@@ -198,11 +222,18 @@ public class TemporalImports {
         if (newer > 0) throw new BusinessException(409, "SOURCE_SNAPSHOT_STALE", "已有较新的来源数据，请重新采集后导入");
     }
 
+    /**
+     * 持久化一段有来源、采集时刻、完整性与批次关联的覆盖证据，保留后续追溯依据。
+     */
     private void coverage(long resource, String source, String mode, TimeWindow window, Instant captured, String completeness, long batch) {
         sql.update("INSERT INTO availability_coverage(resource_id,source_system,from_at,to_at,checked_at,completeness,import_batch_id,data_mode) VALUES (?,?,?,?,?,?,?,?)",
                 resource, source, Timestamp.from(window.start()), Timestamp.from(window.end()), Timestamp.from(captured), completeness, batch, mode);
     }
 
+    /**
+     * 把与新确认窗口相交的旧证据停用，并保留窗口外的左右片段。
+     * 片段沿用原采集时间及批次，不能借拆分延长证据有效期。
+     */
     private void splitCoverage(long resource, String source, String mode, TimeWindow window) {
         var rows = sql.queryForList("SELECT * FROM availability_coverage WHERE resource_id=? AND source_system=? AND data_mode=? AND active=1 AND from_at<? AND to_at>? FOR UPDATE",
                 resource, source, mode, Timestamp.from(window.end()), Timestamp.from(window.start()));
@@ -216,6 +247,9 @@ public class TemporalImports {
         }
     }
 
+    /**
+     * 生成窗口外仍有效的占用片段；保留原来源、原因、批次和观察时间，使用保留前缀避免与源编号混淆。
+     */
     private void fragment(Map<String, Object> row, TimeWindow window) {
         String key = "__fragment_" + row.get("id") + "_" + ImportStorage.hash(window.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         sql.update("INSERT INTO external_occupancy(resource_id,source_system,source_key,start_at,end_at,reason_code,import_batch_id,observed_at,data_mode) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -223,6 +257,9 @@ public class TemporalImports {
                 row.get("import_batch_id"), Timestamp.from(UtcTimes.instant(row.get("observed_at"))), row.get("data_mode"));
     }
 
+    /**
+     * 仅替换相同资源、来源和模式在声明窗口内的占用，不影响其他来源的占用事实。
+     */
     private void replaceOccupancy(long resource, String source, String mode, TimeWindow window) {
         var rows = sql.queryForList("SELECT * FROM external_occupancy WHERE resource_id=? AND source_system=? AND data_mode=? AND active=1 AND start_at<? AND end_at>? FOR UPDATE",
                 resource, source, mode, Timestamp.from(window.end()), Timestamp.from(window.start()));
@@ -235,6 +272,10 @@ public class TemporalImports {
         }
     }
 
+    /**
+     * 确认来源时间批次：重新解析、校验摘要与权限，再锁定所有资源并检查迟到证据。
+     * 覆盖拆分、占用替换和批次提交在同一事务中进行，后续任一资源失败会回滚前序操作。
+     */
     public CatalogIdempotency.Result commit(AuthActor actor, String key, long id) {
         var initial = batch(actor, id, false);
         String type = initial.get("import_type").toString(), source = initial.get("source_system").toString(), mode = initial.get("data_mode").toString();
@@ -271,6 +312,7 @@ public class TemporalImports {
             }
             for (var bound : prepared.rows()) {
                 var entry = bound.entry();
+                // 空闲导入只为文件实际行建立证据；声明窗口中的未报告空白不补成空闲。
                 if ("CONFIRMED_FREE_INTERVALS".equals(type)) {
                     if ("COMPLETE".equals(context.completeness()))
                         replaceOccupancy(bound.resource(), source, mode, entry.window());

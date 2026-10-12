@@ -28,6 +28,11 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * MVC 业务服务的 JWT 认证与实时授权入口。
+ * 先验签与校验声明，再通过 IdentityLookup 读取实时会话和角色，并替换安全上下文。
+ * 因此业务层收到的 AuthActor 来自受信任身份服务，而非客户端请求头。
+ */
 @Configuration(proxyBeanMethods = false)
 @Profile("business")
 public class BusinessSecurity {
@@ -39,6 +44,9 @@ public class BusinessSecurity {
         return decoder;
     }
 
+    /**
+     * 注册无状态安全链：不创建 HTTP 登录会话，所有受保护请求都携带访问令牌。
+     */
     @Bean
     SecurityFilterChain businessSecurity(HttpSecurity http, IdentityLookup identities, ObjectMapper json) throws Exception {
         var sessionFilter = new OncePerRequestFilter() {
@@ -48,6 +56,7 @@ public class BusinessSecurity {
                 var auth = SecurityContextHolder.getContext().getAuthentication();
                 if (auth instanceof JwtAuthenticationToken token) {
                     try {
+                        // 把已验签 JWT 解析为实时操作者，并按当前角色构造 Spring Security 授权信息。
                         var actor = identities.resolve(token.getToken());
                         var authorities = actor.roles().stream().map(r -> new SimpleGrantedAuthority("ROLE_" + r)).toList();
                         var authenticated = new UsernamePasswordAuthenticationToken(actor, token.getToken().getTokenValue(), authorities);
@@ -87,6 +96,9 @@ public class BusinessSecurity {
         json.writeValue(response.getOutputStream(), ApiResponse.error(code, message, MDC.get(TraceIds.MDC_KEY)));
     }
 
+    /**
+     * 内部 Feign 调用沿用当前用户的 Bearer 凭据和 traceId，不创建绕过身份校验的服务专用身份。
+     */
     @Bean
     feign.RequestInterceptor businessFeignHeaders() {
         return request -> {

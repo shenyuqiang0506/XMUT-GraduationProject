@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/**
+ * 本地账号登录页面，只暂存用户当次输入的密码。
+ * 成功获取令牌及当前身份后进入目录，成功登录后清空密码输入；错误通过统一提示展示。
+ */
 import {ref} from 'vue'
 import {useRouter} from 'vue-router'
 import {useSession} from '../stores/session'
@@ -7,6 +11,7 @@ import {explain} from '../api/client'
 const username = ref(''), password = ref(''), busy = ref(false), error = ref(''), session = useSession(),
     router = useRouter()
 
+// 只做必要的空值提示；密码规则、限流和账号有效性由身份服务校验，busy 用于显示提交状态。
 async function submit() {
   error.value = '';
   if (!username.value || !password.value) {

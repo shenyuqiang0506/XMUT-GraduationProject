@@ -9,6 +9,11 @@ import org.shen.platform.support.BusinessException;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
+/**
+ * 来源时间数据的行级解析器，复用目录解析器读取 Excel/JSON。
+ * 占用行需要来源编号和原因，空闲行只声明明确区间；所有时间必须携带偏移量。
+ * 这里仅解析格式，资源权限、完整覆盖声明和数据库更新由 TemporalImports 负责。
+ */
 @Component
 @Profile("business")
 @RequiredArgsConstructor
@@ -28,6 +33,9 @@ public class TemporalFileParser {
             "startAt", List.of("startAt", "开始时间"), "endAt", List.of("endAt", "结束时间"),
             "reasonCode", List.of("reasonCode", "原因代码"));
 
+    /**
+     * 占用快照允许解析空数组，是否真的完整由上层确认；已确认空闲导入必须有实际区间行。
+     */
     public Parsed parse(byte[] bytes, String key, String type, Map<String, String> override) {
         boolean occupancy = "EXTERNAL_OCCUPANCY".equals(type);
         var sourceRows = files.readRows(bytes, key, occupancy);
@@ -62,6 +70,7 @@ public class TemporalFileParser {
                 var window = TimeWindow.of(OffsetDateTime.parse(text(source.values().get(mapping.get("startAt")))),
                         OffsetDateTime.parse(text(source.values().get(mapping.get("endAt")))));
                 window.limitDays(31);
+                // 占用用资源来源编号与占用编号去重；空闲用来源编号与时间区间去重，避免同文件重复证明。
                 String identity = sourceId + "\u0000" + (occupancy ? sourceKey : window.toString());
                 if (!unique.add(identity))
                     throw new BusinessException(400, "DUPLICATE_SOURCE_KEY", "文件中的来源占用或空闲区间重复");

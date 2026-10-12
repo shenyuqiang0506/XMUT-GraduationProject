@@ -9,10 +9,18 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
+/**
+ * 读取部署环境指定的 RSA 密钥文件。
+ * 公钥采用 X.509 编码，私钥采用 PKCS#8 编码；只支持不少于 2048 位的 RSA 密钥。
+ * 失败消息不拼接文件内容，避免密钥材料进入异常响应。
+ */
 public final class JwtKeys {
     private JwtKeys() {
     }
 
+    /**
+     * 去除指定 PEM 头尾及空白后解码。这里只接受配置中的密钥路径，不接收业务请求传入的路径。
+     */
     private static byte[] pem(String path, String type) {
         try {
             String text = Files.readString(Path.of(path));

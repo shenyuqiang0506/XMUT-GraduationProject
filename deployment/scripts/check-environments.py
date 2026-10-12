@@ -8,6 +8,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 configs = {}
 values = {}
+# 读取 Compose 解析后的配置做隔离断言；解析结果含凭据，不打印完整配置。
 for env in ['dev', 'prod']:
     configs[env] = json.loads(subprocess.check_output(
         [str(ROOT / 'scripts/compose.sh'), env, 'config', '--format', 'json'], text=True))
@@ -24,6 +25,7 @@ for env in ['dev', 'prod']:
 for key in values['dev']:
     if any(word in key for word in ['PASSWORD', 'TOKEN', 'IDENTITY_VALUE']):
         assert values['dev'][key] != values['prod'][key], f'Shared credential: {key}'
+# 检查实际网络和数据卷名称互不重叠，防止两套环境复用持久化数据。
 for kind in ['networks', 'volumes']:
     dev = {v['name'] for v in configs['dev'][kind].values()}
     prod = {v['name'] for v in configs['prod'][kind].values()}

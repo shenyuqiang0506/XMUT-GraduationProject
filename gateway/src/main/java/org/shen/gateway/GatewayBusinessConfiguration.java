@@ -15,6 +15,11 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * 网关的正式认证与路由配置。
+ * 公开登录、刷新和健康检查；业务路径先校验 JWT，再通过服务发现转发。
+ * 网关只校验令牌，实时会话和资源范围仍由下游业务服务负责。
+ */
 @Configuration(proxyBeanMethods = false)
 @Profile("business")
 class GatewayBusinessConfiguration {
@@ -45,6 +50,9 @@ class GatewayBusinessConfiguration {
                         .accessDeniedHandler((exchange, failure) -> error(exchange, json, 403, "FORBIDDEN"))).build();
     }
 
+    /**
+     * 仅显式声明已实现的业务路径。移除前两段 /api/v1 后，按 Nacos 服务名寻找下游实例。
+     */
     @Bean
     RouteLocator businessRoutes(RouteLocatorBuilder builder) {
         return builder.routes()

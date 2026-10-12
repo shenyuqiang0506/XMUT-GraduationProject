@@ -14,6 +14,8 @@ REPO=Path(__file__).resolve().parents[2]
 PRIVATE=REPO/'deployment/secrets/dev/idea'
 SERVICES=[('identity-service',8083),('booking-service',8082),('gateway',8081)]
 
+# 以 IDEA 使用的 additional-location 参数启动三个临时服务，检查就绪与网关鉴权。
+# 执行前要求端口空闲，结束时清理本次创建的进程。
 def main():
     for name,port in SERVICES:
         module='GraduationProject' if name=='booking-service' else name
@@ -37,6 +39,7 @@ def main():
             log=os.fdopen(fd,'w')
             command=['java','-Dspring.config.additional-location=file:'+str(PRIVATE/(name+'.properties')),
                      '-jar',str(REPO/module/'target'/(module+'-0.0.1-SNAPSHOT.jar'))]
+            # 清除父进程继承的服务配置，确保验证结果来自 IDEA 的 properties 文件。
             env=os.environ.copy()
             for key in list(env):
                 if key.startswith(('SPRING_','JWT_','AUTH_','DB_','IDENTITY_','REDIS_','RABBITMQ_','NACOS_','SERVER_','IMPORT_')):
@@ -63,6 +66,7 @@ def main():
                 raise RuntimeError('Unexpected gateway authentication response.')
         else:raise RuntimeError('Formal gateway authentication missing.')
         print('PASS: dev/business profiles and formal authentication active; MySQL/Flyway initialization succeeded.',flush=True)
+    # 无论成功或异常都回收临时进程，并检查测试端口是否释放。
     finally:
         for process,log in reversed(children):
             if process.poll() is None:

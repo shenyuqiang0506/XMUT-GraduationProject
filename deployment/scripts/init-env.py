@@ -8,11 +8,14 @@ import secrets
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# 以仅当前用户可读写的权限新建凭据文件；O_EXCL 防止覆盖已有密码。
 def write_private(path, text):
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'w') as stream:
         stream.write(text)
 
+# 每套环境单独生成数据库、中间件凭据，并留存本地账号记录。
+# 此步骤只生成配置，不启动容器，也不会替运行中的服务修改密码。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('environment', choices=['dev', 'prod'])
@@ -29,6 +32,7 @@ def main():
     for service in ['IDENTITY', 'BOOKING', 'AI', 'NOTIFICATION']:
         values[f'{service}_DB_USER'] = f'{service.lower()}_{env}'
         values[f'{service}_DB_PASSWORD'] = token()
+    # Nacos 管理员密码、token 签名密钥和服务端身份值用途不同，分别随机生成。
     values.update(REDIS_USERNAME='default', REDIS_PASSWORD=token(),
                   RABBITMQ_USERNAME=f'xmut_{env}', RABBITMQ_PASSWORD=token(),
                   RABBITMQ_VHOST=f'xmut_{env}', NACOS_USERNAME='nacos', NACOS_PASSWORD=token(),
@@ -52,6 +56,7 @@ def main():
     report += f'\nNacos 控制台：http://127.0.0.1:{ports[5]}；API：127.0.0.1:{ports[4]}。\n'
     report += '\nNacos 的 token 签名密钥、服务端身份值保存在同环境 .env 文件中。Nacos 密码需要 bootstrap-nacos.py 初始化。\n'
     write_private(targets[1], report)
+    # Java 在宿主机运行，因此使用容器映射到本机的端口，而非 Docker 服务名。
     backend = {
         'SPRING_PROFILES_ACTIVE': env,
         'DB_URL': f'jdbc:mysql://127.0.0.1:{ports[0]}/booking_db?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true',

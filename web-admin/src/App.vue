@@ -1,9 +1,14 @@
 <script setup lang="ts">
+/**
+ * 登录后的公共布局、角色菜单和退出入口。
+ * 失去会话时跳转登录页；各页面业务状态由 router-view 对应组件管理。
+ */
 import {watch} from 'vue'
 import {useRouter} from 'vue-router'
 import {useSession} from './stores/session'
 
 const session = useSession(), router = useRouter()
+// 监听身份整体有效性，统一处理主动退出或接口请求发现会话失效后的页面跳转。
 watch(() => session.signedIn, valid => {
   if (!valid) router.replace('/login')
 })

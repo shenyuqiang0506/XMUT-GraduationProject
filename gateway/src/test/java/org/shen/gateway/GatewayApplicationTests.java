@@ -8,6 +8,9 @@ import org.springframework.context.ApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 网关最小上下文验证，确认运行模型为响应式且没有意外引入 JDBC 数据源或 MVC DispatcherServlet。
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class GatewayApplicationTests {
     @Autowired ApplicationContext context;

@@ -1,3 +1,5 @@
+// 目录与账号页面的浏览器验收：由 catalog-smoke.py 准备临时账号和资源。
+// 凭据仅从测试进程环境读取，测试覆盖表单交互、路由权限和并发刷新。
 import {test, expect, type Page} from '@playwright/test'
 
 const required = (name: string) => {
@@ -19,6 +21,7 @@ test('administrator: real login, one concurrent refresh, resource CRUD, users, i
     await login(page, required('TEST_ADMIN_USERNAME'), required('TEST_ADMIN_PASSWORD'))
     await expect(page.getByRole('menuitem', {name: '账号与权限'})).toBeVisible()
     expect(await page.evaluate(() => Object.keys(localStorage).filter(k => /token|password/i.test(k)))).toEqual([])
+    // 将两个接口的首次响应改为 401，验证并发请求共用一次刷新；其余请求继续访问后端。
     let refreshes = 0;
     const intercepted = new Set<string>()
     await page.route('**/api/v1/**', async route => {
@@ -103,7 +106,7 @@ test('student: available catalog and route protection', async ({page}) => {
     await expect(page.getByRole('menuitem', {name: '账号与权限'})).toHaveCount(0);
     await expect(page.getByRole('menuitem', {name: '资料导入'})).toHaveCount(0);
     await expect(page.getByRole('button', {name: '新增资源'})).toHaveCount(0)
-    // Preserve the in-memory session while navigating through the router, then verify the guard.
+    // 通过客户端路由导航保留内存会话，单独验证角色守卫，而非刷新后丢失登录态。
     await page.evaluate(() => {
         history.pushState({}, '', '/users');
         dispatchEvent(new PopStateEvent('popstate'))

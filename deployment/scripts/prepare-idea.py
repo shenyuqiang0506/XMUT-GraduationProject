@@ -16,6 +16,8 @@ COMMON=['JWT_PUBLIC_KEY_PATH','JWT_ISSUER','JWT_AUDIENCE','JWT_KEY_ID','IMPORT_S
 IDENTITY=['JWT_PRIVATE_KEY_PATH','IDENTITY_DB_URL','IDENTITY_DB_USERNAME','IDENTITY_DB_PASSWORD','REDIS_HOST','REDIS_PORT','REDIS_PASSWORD','AUTH_ADMIN_USERNAME','AUTH_ADMIN_PASSWORD']
 BOOKING=['DB_URL','DB_USERNAME','DB_PASSWORD','REDIS_HOST','REDIS_PORT','REDIS_PASSWORD','RABBITMQ_HOST','RABBITMQ_PORT','RABBITMQ_USERNAME','RABBITMQ_PASSWORD','RABBITMQ_VHOST']
 
+# 按 Java properties 语法转义值，保留空格、分隔符及中文路径。
+# 非 ASCII 字符按 UTF-16 编码，兼容 properties 文件的 Unicode 转义读取。
 def escape(value):
     out=[]
     for c in value:
@@ -30,6 +32,7 @@ def escape(value):
         else:out.append(c)
     return ''.join(out)
 
+# IDEA 运行配置只引用私密 properties 的路径，不把密码嵌入共享 XML。
 def config(service,module,main,name,prefix):
     root=ET.Element('component',name='ProjectRunConfigurationManager')
     conf=ET.SubElement(root,'configuration',default='false',name=name,type='SpringBootApplicationConfigurationType',factoryName='Spring Boot')
@@ -41,6 +44,7 @@ def config(service,module,main,name,prefix):
     method=ET.SubElement(conf,'method',v='2');ET.SubElement(method,'option',name='Make',enabled='true')
     return root
 
+# 组合启动身份、预约和网关三个后端服务，数据库等基础设施由 Docker 单独管理。
 def compound():
     root=ET.Element('component',name='ProjectRunConfigurationManager')
     conf=ET.SubElement(root,'configuration',default='false',name='后端总启动（dev）',type='CompoundRunConfigurationType')
@@ -51,6 +55,8 @@ def compound():
 def write_xml(path,root):
     ET.indent(root,space='  ');path.write_text(ET.tostring(root,encoding='unicode')+'\n')
 
+# 通过各服务的键白名单生成 dev 配置，限制签名私钥及数据库密码的分发范围。
+# 拒绝符号链接目标，文件写入权限保持为 600。
 def main():
     PRIVATE.mkdir(mode=0o700,parents=True,exist_ok=True);os.chmod(PRIVATE,0o700)
     for service,module,main_class,name,port in SERVICES:

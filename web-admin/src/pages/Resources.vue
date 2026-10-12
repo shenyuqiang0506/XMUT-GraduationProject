@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/**
+ * 资源目录列表、详情、编辑及审批组配置页面。
+ * 来源可借用与平台开放分别显示；没有具体时间窗口时，目录状态不能证明资源可预约。
+ */
 import {ref, onMounted} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
@@ -39,6 +43,7 @@ const form = ref(blank()), featureText = ref('{}')
 const states: Record<string, string> = {DRAFT: '草稿', OPEN: '已开放', CLOSED: '已关闭', RETIRED: '已退役'},
     borrow: Record<string, string> = {YES: '来源可借', NO: '来源不可借', UNKNOWN: '来源未确认'}
 
+// 查询参数通过 URLSearchParams 编码；服务端返回的资源已按当前身份过滤范围。
 async function load() {
   busy.value = true;
   error.value = '';
@@ -54,6 +59,7 @@ async function load() {
   }
 }
 
+// 只有管理角色需要审批组列表，普通用户不发起该管理请求。
 async function loadGroups() {
   if (session.manager) groups.value = (await api<{ items: Group[] }>('/admin/approval-groups')).items
 }
@@ -63,6 +69,7 @@ onMounted(() => {
   loadGroups().catch(e => error.value = explain(e))
 })
 
+// 编辑时复制记录并补齐表单空值，不直接修改原列表；新增采用真实来源与草稿状态。
 function open(row?: Resource) {
   editing.value = row || null;
   form.value = row ? {
@@ -81,6 +88,8 @@ function open(row?: Resource) {
   dialog.value = true
 }
 
+// 新增提交完整模型；编辑剔除不可变来源字段及只读状态，并提交读取时的资源版本。
+// 请求未明确成功时保留幂等键，成功后刷新列表而非在本地推测最终版本。
 async function save() {
   saving.value = true;
   try {
@@ -105,6 +114,7 @@ async function save() {
   }
 }
 
+// 详情重新请求后端，以当前权限和最新记录为准，不直接复用可能过时的列表对象。
 async function show(row: Resource) {
   try {
     detail.value = await api<Resource>('/resources/' + row.id)
@@ -126,6 +136,7 @@ async function groupCreate() {
   }
 }
 
+// 为系统管理员加载审批组和当前页中的有效管理账号；最终成员资格仍由后端实时核验。
 async function openGroups() {
   try {
     await loadGroups();
@@ -136,10 +147,12 @@ async function openGroups() {
   }
 }
 
+// 切换审批组时复制其成员集合，避免保存前误改其他组的本地展示数据。
 function selectGroup() {
   members.value = [...(groups.value.find(g => g.id === membersGroup.value)?.memberUserIds || [])]
 }
 
+// 整体提交成员 ID 集合，空集合表示清空；成功后重新拉取组成员状态。
 async function saveMembers() {
   const payload = {userIds: members.value}, path = '/admin/approval-groups/' + membersGroup.value + '/members';
   try {

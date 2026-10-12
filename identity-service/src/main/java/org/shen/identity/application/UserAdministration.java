@@ -17,6 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * 系统管理员的账号管理用例。
+ * 权限在写事务内重新核验，幂等记录与实际修改共同提交，并保护最后一个有效管理员。
+ * 状态或角色变化会递增身份版本并撤销全部旧会话，使旧 JWT 不能继续使用。
+ */
 @Service
 @Profile("business")
 @RequiredArgsConstructor
@@ -47,6 +52,10 @@ public class UserAdministration {
         }
     }
 
+    /**
+     * 以操作者、操作和请求键隔离幂等记录；相同内容重试回放原响应，不重复执行写入。
+     * 记录行、管理员守卫及用户行都在同一事务中锁定，保证权限与最后管理员约束不被并发绕过。
+     */
     private Mutation idempotent(AuthActor actor, String operation, String key, Object payload, Supplier<Mutation> work) {
         if (key == null || !key.matches("[A-Za-z0-9_-]{8,64}"))
             throw new BusinessException(400, "INVALID_IDEMPOTENCY_KEY", "需要 8–64 位幂等键");
@@ -56,7 +65,7 @@ public class UserAdministration {
                 repo.sql().update("INSERT INTO idempotency_record(actor_id,operation,request_key,payload_hash,status,expires_at) VALUES (?,?,?,?,'IN_PROGRESS',UTC_TIMESTAMP(3)+INTERVAL 1 DAY) ON DUPLICATE KEY UPDATE id=id",
                         Long.parseLong(actor.userId()), operation, key, hash);
                 var row = repo.sql().queryForMap("SELECT * FROM idempotency_record WHERE actor_id=? AND operation=? AND request_key=? FOR UPDATE", Long.parseLong(actor.userId()), operation, key);
-                // Serialize identity administration; lock ordering is stable even for mutual admin changes.
+                // 通过守卫行串行化账号管理，即使两个管理员互相修改，也保持一致的加锁顺序。
                 repo.sql().queryForObject("SELECT id FROM identity_admin_guard WHERE id=1 FOR UPDATE", Integer.class);
                 long target = operation.contains(":") ? Long.parseLong(operation.substring(operation.indexOf(':') + 1)) : Long.parseLong(actor.userId());
                 repo.sql().queryForList("SELECT id FROM `user` WHERE id IN (?,?) ORDER BY id FOR UPDATE", Long.class, Long.parseLong(actor.userId()), target);
@@ -77,7 +86,7 @@ public class UserAdministration {
     public Mutation create(AuthActor actor, String key, AuthCommands.CreateUser command) {
         if (command.initialPassword().getBytes(StandardCharsets.UTF_8).length > 72)
             throw new BusinessException(400, "VALIDATION_ERROR", "密码最多 72 个 UTF-8 字节");
-        // Hash before taking the administration lock; do not persist or return the initial password.
+        // BCrypt 计算放在管理员锁外，缩短持锁时间；初始密码既不持久化也不返回。
         String encoded = passwords.encode(command.initialPassword());
         var normalized = new AuthCommands.CreateUser(command.username(), tokens.passwordFingerprint(command.initialPassword()), command.displayName(), new TreeSet<>(command.roleCodes()));
         return idempotent(actor, "CREATE_USER", key, normalized, () -> {
@@ -95,6 +104,9 @@ public class UserAdministration {
         return user;
     }
 
+    /**
+     * 只有从有效系统管理员降权或停用时才检查剩余人数；调用方已经持有管理员守卫锁。
+     */
     private void keepAdministrator(IdentityRepository.User target, boolean willBeAdmin) {
         if ("ACTIVE".equals(target.status()) && repo.roles(target.id()).contains("SYSTEM_ADMIN") && !willBeAdmin) {
             long count = repo.sql().queryForObject("SELECT COUNT(*) FROM `user` u JOIN user_role ur ON ur.user_id=u.id JOIN `role` r ON r.id=ur.role_id WHERE u.status='ACTIVE' AND r.code='SYSTEM_ADMIN'", Long.class);
@@ -102,6 +114,9 @@ public class UserAdministration {
         }
     }
 
+    /**
+     * 撤销目标用户所有未撤销会话；提交后补写缓存，数据库记录立即成为权威状态。
+     */
     private void invalidate(long id) {
         var ids = repo.sql().queryForList("SELECT id FROM user_session WHERE user_id=? AND revoked_at IS NULL", Long.class, id);
         repo.sql().update("UPDATE user_session SET revoked_at=UTC_TIMESTAMP(3),version=version+1 WHERE user_id=? AND revoked_at IS NULL", id);
@@ -120,7 +135,7 @@ public class UserAdministration {
     }
 
     public Mutation roles(AuthActor actor, String key, long id, AuthCommands.Roles command) {
-        // Canonicalize unordered role lists for the idempotency fingerprint.
+        // 将无序角色集合排序后再计算幂等指纹，避免仅顺序不同被误判为不同请求。
         var normalized = new AuthCommands.Roles(new TreeSet<>(command.roleCodes()), command.expectedVersion());
         return idempotent(actor, "USER_ROLES:" + id, key, normalized, () -> {
             var user = target(id, command.expectedVersion());

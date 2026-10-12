@@ -9,6 +9,8 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# 读取目标环境的 Nacos 管理员凭据，完成首次初始化和环境标记校验。
+# 重复执行优先尝试登录；不会自动覆盖已有的业务配置。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('environment', choices=['dev', 'prod'])
@@ -18,6 +20,7 @@ def main():
     if values['APP_ENV'] != env:
         raise SystemExit('Environment mismatch')
     base = 'http://127.0.0.1:' + ('8848' if env == 'dev' else '18848') + '/nacos'
+    # 统一封装 Nacos 表单请求与 accessToken 请求头，超时后交由调用方处理。
     def request(method, path, fields=None, token=None):
         fields = fields or {}
         encoded = urllib.parse.urlencode(fields)
@@ -32,6 +35,7 @@ def main():
             # Do not include the response; bootstrap responses may contain credentials.
             raise RuntimeError(f'Nacos rejected {path}, code={result.get("code")}')
         return result.get('data', result) if isinstance(result, dict) else result
+    # 先登录；尚未初始化时调用管理员初始化接口，再验证同一密码能否登录。
     login_fields = {'username': values['NACOS_USERNAME'], 'password': values['NACOS_PASSWORD']}
     try:
         login = request('POST', '/v3/auth/user/login', login_fields)
@@ -39,6 +43,7 @@ def main():
         request('POST', '/v3/auth/user/admin', {'password': values['NACOS_PASSWORD']})
         login = request('POST', '/v3/auth/user/login', login_fields)
     token = login['accessToken']
+    # 仅发布不含密钥的环境标记；已存在配置必须保留正确标记，写入后再回读核对。
     for data_id in ['GraduationProject.properties', 'booking-service.properties', 'identity-service.properties', 'ai-service.properties', 'gateway.properties']:
         fields = {'dataId': data_id, 'groupName': 'DEFAULT_GROUP', 'namespaceId': 'public'}
         expected = f'platform.environment={env}\n'

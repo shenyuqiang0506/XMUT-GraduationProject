@@ -18,11 +18,14 @@ STATE=PRIVATE/'business-processes.json'
 spec=importlib.util.spec_from_file_location('runtime',Path(__file__).with_name('run-service.py'))
 runtime=importlib.util.module_from_spec(spec);spec.loader.exec_module(runtime)
 
+# 用进程启动时间识别记录中的进程，排除已退出或僵尸进程。
+# 不能只凭 PID 杀进程，因为系统可能把旧 PID 分配给其他程序。
 def identity(pid):
     result=subprocess.run(['ps','-p',str(pid),'-o','stat=','-o','lstart='],capture_output=True,text=True)
     fields=result.stdout.strip().split(maxsplit=1)
     return fields[1] if result.returncode==0 and len(fields)==2 and not fields[0].startswith('Z') else ''
 
+# 只收集同一进程组内的后代，覆盖 npm 启动的前端子进程。
 def descendants(pid,group):
     children=[]
     result=subprocess.run(['pgrep','-P',str(pid)],capture_output=True,text=True)
@@ -37,10 +40,13 @@ def descendants(pid,group):
             children.extend(descendants(child,group))
     return children
 
+# 保存本启动器拥有的进程记录，供后续 status/stop 操作核对归属。
 def write_state(records):
     fd=os.open(STATE,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
     with os.fdopen(fd,'w') as stream:json.dump(records,stream)
 
+# 逐个核对进程身份与组归属，先温和终止，等待后才强制结束仍存活的进程。
+# 只处理记录对应的开发进程，不停止 Docker 容器。
 def stop(records):
     targets=[]
     for record in records:
@@ -69,6 +75,7 @@ def main():
         print('Running: '+(', '.join(r['name'] for r in live) or 'none'));return
     if args.action=='stop':stop(live);print('Stopped only recorded, identity-checked dev process groups. Docker was not stopped.');return
     if live:raise SystemExit('Recorded dev processes already exist; use status/stop before starting.')
+    # 启动前检查全部端口；若被占用则退出，不接管或结束其他程序。
     services=[('identity-service',8083),('booking-service',8082),('gateway',8081),('web-admin',5173)]
     for _,port in services:
         with socket.socket() as probe:
@@ -85,6 +92,7 @@ def main():
             if name=='web-admin':
                 command=['npm','run','dev'];cwd=REPO/name;env=os.environ.copy()
                 for key in list(env):
+                    # 移除后端敏感配置及继承的 VITE_ 变量，避免传入前端开发进程。
                     if any(x in key for x in ['PASSWORD','SECRET','TOKEN','API_KEY','PRIVATE_KEY','VITE_']):env.pop(key,None)
             else:
                 module='GraduationProject' if name=='booking-service' else name
@@ -94,6 +102,7 @@ def main():
             fd=os.open(logs/(name+'.log'),os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
             with os.fdopen(fd,'w') as log:p=subprocess.Popen(command,env=env,cwd=cwd,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
             record={'name':name,'pid':p.pid,'identity':identity(p.pid),'port':port};records.append(record);write_state(records)
+        # HTTP 就绪检查确认服务可响应；进程存在本身不代表启动成功。
         waiting={port for _,port in services};deadline=time.monotonic()+100
         while waiting and time.monotonic()<deadline:
             if any(identity(r['pid'])!=r['identity'] for r in records):raise RuntimeError('Dev process exited; inspect private business-logs.')

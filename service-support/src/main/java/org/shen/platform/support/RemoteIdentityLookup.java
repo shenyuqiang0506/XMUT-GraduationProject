@@ -12,6 +12,11 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+/**
+ * 业务服务向身份服务核实令牌对应的实时身份。
+ * 从服务发现获取实例，透传原始 Bearer 令牌与追踪编号；不采信调用方自报的角色。
+ * 无实例或无效响应均拒绝本次业务调用，不能降级为默认放行。
+ */
 public final class RemoteIdentityLookup implements IdentityLookup {
     private final DiscoveryClient discovery;
     private final RestClient http;
@@ -32,6 +37,7 @@ public final class RemoteIdentityLookup implements IdentityLookup {
                     .header(TraceIds.HEADER, TraceIds.acceptOrCreate(MDC.get(TraceIds.MDC_KEY)))
                     .retrieve().body(new ParameterizedTypeReference<ApiResponse<AuthActor>>() {
                     });
+            // 同时核对用户和会话标识，防止成功格式的错误响应被当作当前请求身份。
             if (response == null || !"OK".equals(response.code()) || response.data() == null
                     || !jwt.getSubject().equals(response.data().userId())
                     || !jwt.getClaimAsString("sid").equals(response.data().sessionId())) {

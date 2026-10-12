@@ -1,3 +1,7 @@
+/**
+ * 管理端路由与角色导航守卫。
+ * meta 中的权限仅用于界面导航；真正的数据访问权限仍由后端每次请求重新检查。
+ */
 import {createRouter, createWebHistory} from 'vue-router'
 import {useSession} from '../stores/session'
 import Login from '../pages/Login.vue'
@@ -22,6 +26,7 @@ export const router = createRouter({
         meta: {admin: true}
     }, {path: '/:pathMatch(.*)*', redirect: '/resources'}]
 })
+// 先检查登录状态，再检查管理员权限；不允许通过手工输入地址绕过页面导航限制。
 router.beforeEach(to => {
     const s = useSession();
     if (!s.signedIn && to.path != '/login') return '/login';

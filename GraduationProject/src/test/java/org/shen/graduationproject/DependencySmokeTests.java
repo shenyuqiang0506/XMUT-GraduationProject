@@ -14,6 +14,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 依赖装配的快速冒烟测试，不访问真实业务库。
+ * 验证 Lombok 编译生成代码、Hutool、Excel 读写、Bean Validation 与 BCrypt 能正常调用。
+ * 通过这些测试只说明依赖可用，不能替代正式业务权限或真实数据库事务验收。
+ */
 class DependencySmokeTests {
     record Request(@Min(1) int participants) {}
 
@@ -31,6 +36,9 @@ class DependencySmokeTests {
         assertThat(StrUtil.isBlank(" \t\n")).isTrue();
     }
 
+    /**
+     * 内存中写出再读回中文 XLSX，验证读写库可用；其中名称只是测试样例。
+     */
     @Test
     void excelWorkbookRoundTrips() throws Exception {
         byte[] data;

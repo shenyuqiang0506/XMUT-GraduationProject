@@ -17,6 +17,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 
+/**
+ * 在一致性快照中查询资源日历和场地、设备可行组合。
+ * 开放规则、有效来源覆盖与已知占用共同决定状态；缺少占用记录不代表可用。
+ * 当前仅计算外部占用，不创建暂占，也不替代未来申请提交时的加锁复核。
+ */
 @Service
 @Profile("business")
 @RequiredArgsConstructor
@@ -25,6 +30,9 @@ public class AvailabilityQueries {
     private final CatalogAccess access;
     private final BookingPolicies policies;
 
+    /**
+     * 按资源 ID 分组的一次查询数据，包含开放规则、来源覆盖和外部占用，供多个候选组合复用。
+     */
     private record Snapshot(Map<Long, List<Map<String, Object>>> rules,
                             Map<Long, List<Map<String, Object>>> coverage,
                             Map<Long, List<Map<String, Object>>> occupancy) {
@@ -45,6 +53,9 @@ public class AvailabilityQueries {
         return groups;
     }
 
+    /**
+     * 批量读取所有候选在目标窗口相关的数据，SQL 使用半开区间重叠条件，端点相接不算占用。
+     */
     private Snapshot load(List<Map<String, Object>> resources, TimeWindow window) {
         if (resources.isEmpty()) return new Snapshot(Map.of(), Map.of(), Map.of());
         Object[] ids = resources.stream().map(AvailabilityQueries::id).toArray();
@@ -66,6 +77,9 @@ public class AvailabilityQueries {
         return value instanceof Time t ? t.toLocalTime() : (LocalTime) value;
     }
 
+    /**
+     * 把星期规则与有效日期映射到查询起始日的上海时间区间；搜索已限定同一自然日。
+     */
     private List<TimeWindow> openings(List<Map<String, Object>> rows, TimeWindow window) {
         LocalDate day = window.start().atZone(TimeWindow.ZONE).toLocalDate();
         return rows.stream().filter(r -> ((Number) r.get("weekday")).intValue() == day.getDayOfWeek().getValue()
@@ -74,6 +88,10 @@ public class AvailabilityQueries {
                         day.atTime(time(r.get("end_local"))).atZone(TimeWindow.ZONE).toInstant())).toList();
     }
 
+    /**
+     * 只用有效的 COMPLETE 区间并集证明整个目标窗口。
+     * 存在部分证据或完整证据的缺口则返回 PARTIAL，完全缺失或证据失效返回 UNKNOWN。
+     */
     private String coverage(Map<String, Object> resource, TimeWindow window, BookingPolicies.Active policy, Instant now, Snapshot data) {
         if (policy == null) return "UNKNOWN";
         var complete = new ArrayList<TimeWindow>();
@@ -93,6 +111,10 @@ public class AvailabilityQueries {
         return partial || !complete.isEmpty() ? "PARTIAL" : "UNKNOWN";
     }
 
+    /**
+     * 判定顺序：资源与审批组状态、开放时间、已知占用、完整覆盖。
+     * 只有全部条件满足才返回 AVAILABLE，缺少证明不能被当作空闲。
+     */
     private String status(Map<String, Object> resource, TimeWindow window, BookingPolicies.Active policy, Instant now, Snapshot data) {
         if (!"OPEN".equals(resource.get("platform_status")) || !"ACTIVE".equals(resource.get("group_status"))
                 || ("REAL".equals(resource.get("data_mode")) && !"YES".equals(resource.get("source_borrowable")))
@@ -105,6 +127,9 @@ public class AvailabilityQueries {
         return "COMPLETE".equals(coverage(resource, window, policy, now, data)) ? "AVAILABLE" : "UNKNOWN";
     }
 
+    /**
+     * 将数据库时间字段转换为接口约定的日期与本地时刻字符串，供详情和规则编辑页面使用。
+     */
     public List<Map<String, Object>> openingRules(long resource) {
         var result = new ArrayList<Map<String, Object>>();
         for (var row : sql.queryForList("SELECT weekday,start_local,end_local,valid_from,valid_to,enabled FROM resource_opening_rule WHERE resource_id=? ORDER BY weekday,start_local", resource)) {
@@ -115,6 +140,10 @@ public class AvailabilityQueries {
         return result;
     }
 
+    /**
+     * 日历读取采用可重复读事务，防止占用、覆盖与策略分别读到不同批次的提交状态。
+     * 允许最多 31 天窗口，展示时把记录裁剪到请求范围，并隐藏其他人的活动内容。
+     */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Map<String, Object> calendar(AuthActor actor, long resource, OffsetDateTime from, OffsetDateTime to) {
         var window = TimeWindow.of(from, to);
@@ -152,6 +181,10 @@ public class AvailabilityQueries {
                 "openingRules", openingRules(resource), "checkedAt", TimeWindow.display(now), "coverageIntervals", evidence);
     }
 
+    /**
+     * 查找一处场地与同审批组、同校区设备的可行组合。
+     * 先校验规则及人数、设施条件，再批量检查时间；每处场地只返回一套确定的设备选择，而非枚举所有排列。
+     */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Map<String, Object> search(AuthActor actor, Search input) {
         policies.mode(input.dataMode());
@@ -181,6 +214,7 @@ public class AvailabilityQueries {
             where.append(" AND EXISTS(SELECT 1 FROM resource_feature f WHERE f.resource_id=r.id AND f.feature_code=? AND LOWER(TRIM(f.feature_value)) NOT IN ('no','false','0','unknown','否','无','未知','待核实','不详') AND LENGTH(TRIM(f.feature_value))>0)");
             args.add(feature);
         }
+        // 多取一条用于判断候选超限。超过计算上限时明确要求缩小条件，不截断候选后虚报完整结果。
         var venues = sql.queryForList("SELECT r.*,ag.status group_status FROM resource r JOIN approval_group ag ON ag.id=r.approval_group_id" + where + " ORDER BY r.id LIMIT 2001", args.toArray());
         if (venues.size() > 2000) throw new BusinessException(422, "QUERY_TOO_BROAD", "请缩小场地筛选范围");
         var equipment = new ArrayList<Map<String, Object>>();
@@ -195,6 +229,7 @@ public class AvailabilityQueries {
         var all = new ArrayList<>(venues);
         all.addAll(equipment);
         Snapshot data = load(all, window);
+        // 设备先独立通过可用性检查，再按组、校区、类型匹配场地；SQL 已按 ID 排序，选择结果可重复。
         var usable = equipment.stream().filter(r -> "AVAILABLE".equals(status(r, window, policy, now, data))).toList();
         var plans = new ArrayList<Map<String, Object>>();
         for (var venue : venues) {
@@ -220,6 +255,7 @@ public class AvailabilityQueries {
                     "resourceIds", members, "approvalGroupId", venue.get("approval_group_id").toString(), "availability", "AVAILABLE",
                     "coverageStatus", "COMPLETE", "dataMode", input.dataMode(), "checkedAt", TimeWindow.display(now), "policyVersion", policy.version()));
         }
+        // 分页作用于已通过全部校验的场地组合，total 是可行场地数，而非初始候选数。
         int offset = Math.min(plans.size(), (input.page() - 1) * input.size());
         // 结果是当前快照，不创建暂占；后续提交联合预约时必须再次锁资源并校验。
         return Map.of("items", plans.subList(offset, Math.min(plans.size(), offset + input.size())), "page", input.page(),

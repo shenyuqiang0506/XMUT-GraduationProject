@@ -20,11 +20,14 @@ c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)
 BASE='http://127.0.0.1:8081/api/v1'
 ZONE=timezone(timedelta(hours=8))
 
+# 为本轮验收使用独立 JWT audience，隔离与日常开发共用的登录限流键。
 class AvailabilityStack(s.Stack):
     def start(self,name,port,overrides=None):
         # 三个服务使用同一独立 dev audience，登录保护保持启用且不消耗日常开发额度。
         super().start(name,port,dict(overrides or {},JWT_AUDIENCE='xmut-dev-api-'+self.group))
 
+# 构造临时资源、策略和时间快照，验证完整覆盖、冲突、权限与并发导入边界。
+# 测试输入不代表学校实际制度；原有启用策略在清理阶段恢复。
 def main():
     prefix='ava-'+uuid.uuid4().hex[:10];source=prefix.replace('-','_');checks=[]
     private=s.runtime.load_env(s.PRIVATE/'identity.env')
@@ -49,8 +52,10 @@ def main():
         try:r=urllib.request.urlopen(request,timeout=30)
         except urllib.error.HTTPError as error:r=error
         with r:return r.status,json.load(r),dict(r.headers)
+    # 显式声明资源范围、覆盖区间和完整性，不能凭空文件推断覆盖所有资源。
     def context(ids,from_=8,to=18,complete='COMPLETE'):
         return {'from':at(from_),'to':at(to),'capturedAt':captured(),'completeness':complete,'sourceDescription':'DEMO 自动验收来源，不代表学校制度','resourceIds':ids}
+    # 先走预览再确认，与管理端导入流程一致，复用返回的批次信息。
     def commit_batch(token,kind,rows,ctx,**kwargs):
         status,body,_=upload(token,kind,rows,ctx,**kwargs)
         assert status==201,(status,body['code'])

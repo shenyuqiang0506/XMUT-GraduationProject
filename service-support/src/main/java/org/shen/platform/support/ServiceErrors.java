@@ -9,6 +9,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+/**
+ * Servlet 业务服务统一异常出口。
+ * 将参数错误、业务拒绝和依赖故障转换为同一响应结构，不返回底层堆栈或 SQL。
+ */
 @RestControllerAdvice
 public class ServiceErrors {
     @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)

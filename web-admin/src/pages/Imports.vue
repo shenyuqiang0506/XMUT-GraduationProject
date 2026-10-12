@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/**
+ * 文件导入的预览与确认工作流。
+ * 浏览器先检查文件大小及 JSON 参数，再上传文件、映射和来源上下文；服务端执行最终校验。
+ * 只有对应当前输入且无阻断错误的预览批次才允许确认。
+ */
 import {ref, onMounted, watch} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
@@ -22,6 +27,7 @@ onMounted(async () => {
   }
 })
 
+// 分页加载可管理或可见的资源供时间范围选择，具体来源与模式在模板中进一步过滤。
 async function loadResources() {
   const data = await api<Page<Resource>>('/resources?size=100&page=' + resourcePage.value)
   resources.value.push(...data.items);
@@ -37,17 +43,21 @@ async function more() {
   }
 }
 
+// 导入类型或来源条件变化时，同时丢弃旧批次与已选资源范围。
 function changed() {
   batch.value = null;
   resourceIds.value = []
 }
 
+// 更换文件后必须重新预览，不能沿用另一文件的批次确认按钮。
 function selected(e: Event) {
   file.value = (e.target as HTMLInputElement).files?.[0] || null;
   batch.value = null;
   error.value = ''
 }
 
+// 将文件摘要与全部输入共同作为前端幂等内容；服务端仍独立计算摘要并保存受控文件。
+// 目录导入附审批组上下文，时间导入附覆盖窗口、采集时间和明确资源范围。
 async function preview() {
   busy.value = true;
   error.value = '';
@@ -90,6 +100,7 @@ async function preview() {
   }
 }
 
+// 只确认已保存的 batchId；不重新上传文件。最终摘要、权限及行错误检查仍由服务端执行。
 async function commit() {
   if (!batch.value || batch.value.summary.errorRows > 0) return;
   busy.value = true;

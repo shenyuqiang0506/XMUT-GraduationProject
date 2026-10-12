@@ -9,6 +9,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# 独占创建私密环境文件，并转义 shell 特殊字符，供启动器安全读取。
 def envfile(path, values):
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'w') as stream:
@@ -35,6 +36,7 @@ def main():
         os.close(fd)
     subprocess.run(['openssl', 'genpkey', '-algorithm', 'RSA', '-pkeyopt', 'rsa_keygen_bits:3072', '-out', str(targets[0])], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(['openssl', 'pkey', '-in', str(targets[0]), '-pubout', '-out', str(targets[1])], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # 其他服务只需公钥即可验证 JWT；私钥路径仅写入下方身份服务配置。
     common = {'JWT_PUBLIC_KEY_PATH': targets[1], 'JWT_ISSUER': 'urn:xmut:' + environment + ':identity',
               'JWT_AUDIENCE': 'xmut-' + environment + '-api', 'JWT_KEY_ID': 'xmut-' + environment + '-v1',
               'IMPORT_STORAGE_DIR': private / 'imports'}
@@ -44,6 +46,8 @@ def main():
                 'IDENTITY_DB_URL': 'jdbc:mysql://127.0.0.1:' + port + '/identity_db?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true',
                 'IDENTITY_DB_USERNAME': source['IDENTITY_DB_USER'], 'IDENTITY_DB_PASSWORD': source['IDENTITY_DB_PASSWORD'],
                 'REDIS_HOST': '127.0.0.1', 'REDIS_PORT': '6379' if environment == 'dev' else '16379', 'REDIS_PASSWORD': source['REDIS_PASSWORD']}
+    # 仅开发环境生成初始化管理员；密码留存在被忽略的本地账号文件中。
+    # 生成账号记录不代表账号已经入库，还需以 bootstrap-admin 配置启动身份服务。
     if environment == 'dev':
         identity.update(AUTH_ADMIN_USERNAME='admin_dev', AUTH_ADMIN_PASSWORD=secrets.token_hex(24))
         record = private / 'business-accounts.md'

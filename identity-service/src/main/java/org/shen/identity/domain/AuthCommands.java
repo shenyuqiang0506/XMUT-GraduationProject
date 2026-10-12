@@ -4,6 +4,11 @@ import java.util.Set;
 
 import jakarta.validation.constraints.*;
 
+/**
+ * 身份接口输入契约，通过 Jakarta Validation 限制格式、长度与枚举范围。
+ * expectedVersion 表示调用方读取的身份版本，用于拒绝覆盖他人的并发修改。
+ * 密码还需在应用层校验 UTF-8 字节长度，以满足 BCrypt 的 72 字节限制。
+ */
 public final class AuthCommands {
     private AuthCommands() {
     }

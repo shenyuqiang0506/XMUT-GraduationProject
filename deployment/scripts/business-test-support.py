@@ -15,11 +15,14 @@ auth=importlib.util.module_from_spec(spec);spec.loader.exec_module(auth)
 runtime=auth.runtime
 PRIVATE=auth.PRIVATE
 
+# 通过 dev MySQL 容器执行验收 SQL；密码在容器内取值，不拼入宿主机命令参数。
 def sql(query,database='booking_db'):
     result=subprocess.run([str(REPO/'deployment/scripts/compose.sh'),'dev','exec','-T','mysql','sh','-c',
         'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot -N -B '+database],input=query.encode(),capture_output=True,check=True)
     return result.stdout.decode().strip()
 
+# 验收专用服务上下文：使用独立 Nacos 分组，记录并清理本次启动的子进程。
+# 测试使用本地 dev 基础设施，不启动或操作 prod 服务。
 class Stack:
     def __init__(self,label):
         self.group='business-'+uuid.uuid4().hex[:12];self.children=[];self.label=label
@@ -42,6 +45,7 @@ class Stack:
         module='GraduationProject' if name=='booking-service' else name
         child=subprocess.Popen(['java','-jar',str(REPO/module/'target'/(module+'-0.0.1-SNAPSHOT.jar'))],env=env,cwd=REPO,stdout=log,stderr=subprocess.STDOUT)
         self.children.append((name,child,log))
+    # 等待三个服务的健康就绪端点成功；进程提前退出或超时均判为启动失败。
     def ready(self):
         waiting={8081,8082,8083};deadline=time.monotonic()+100
         while waiting and time.monotonic()<deadline:
@@ -62,6 +66,8 @@ class Stack:
             log.close()
 
 
+# 按本轮生成的唯一前缀清理测试用户、会话和关联记录。
+# 前缀来自测试脚本内部，不应传入外部用户提供的任意 SQL 内容。
 def cleanup_identity(prefix):
     safe="'"+prefix+"%'"
     sql("DELETE t FROM used_refresh_token t JOIN user_session s ON s.id=t.session_id JOIN `user` u ON u.id=s.user_id WHERE u.username LIKE "+safe+" OR s.device_id LIKE "+safe+";"

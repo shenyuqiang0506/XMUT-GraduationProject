@@ -18,6 +18,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * 按 REAL、DEMO 分别管理预约策略版本及生效依据。
+ * 没有生效策略时不补默认值；新版本在范围守卫锁下替换当前版本，旧版本保留。
+ * 时间判断采用数据库 UTC 时钟，避免不同应用实例的本机时钟差影响规则判定。
+ */
 @Service
 @Profile("business")
 @RequiredArgsConstructor
@@ -33,6 +38,9 @@ public class BookingPolicies {
     public record Active(int version, PolicySettings settings) {
     }
 
+    /**
+     * 校验数据模式并限制测试资料环境；部署环境 dev 与数据模式 REAL 是两个独立维度。
+     */
     public void mode(String mode) {
         if (!java.util.Set.of("REAL", "DEMO").contains(mode))
             throw new BusinessException(400, "VALIDATION_ERROR", "需要明确指定 REAL 或 DEMO");
@@ -40,10 +48,16 @@ public class BookingPolicies {
             throw new BusinessException(403, "FORBIDDEN", "演示数据仅允许在 dev/test 环境使用");
     }
 
+    /**
+     * 取得数据库 UTC 毫秒时间，作为来源新鲜度和预约提前量共同的判断基准。
+     */
     public Instant now() {
         return sql.queryForObject("SELECT UTC_TIMESTAMP(3)", Timestamp.class).toInstant();
     }
 
+    /**
+     * 读取指定模式的当前生效版本；没有配置时返回 null，由调用方明确处理而非套用默认规则。
+     */
     public Active active(String scope) {
         mode(scope);
         var rows = sql.queryForList("SELECT policy_version,settings FROM booking_policy WHERE scope_code=? AND active=1", scope);
@@ -53,6 +67,9 @@ public class BookingPolicies {
                 json.readValue(row.get("settings").toString(), PolicySettings.class));
     }
 
+    /**
+     * 向管理员返回生效策略或未配置状态；版本 0 代表尚未创建策略。
+     */
     public Map<String, Object> get(AuthActor actor, String scope) {
         access.administrator(actor);
         mode(scope);
@@ -63,6 +80,9 @@ public class BookingPolicies {
                 "settings", json.readValue(row.get("settings").toString(), Map.class), "basis", row.get("basis"));
     }
 
+    /**
+     * 只允许系统管理员带版本和制度依据创建新策略。守卫行保证首次创建也有可锁对象。
+     */
     public CatalogIdempotency.Result create(AuthActor actor, String key, String scope, PolicyVersion input) {
         access.systemAdministrator(actor);
         mode(scope);
@@ -83,6 +103,9 @@ public class BookingPolicies {
         });
     }
 
+    /**
+     * 约束上海自然日、最晚提前量、最远预约时间及活动最大时长；此方法不检查资源占用。
+     */
     public void eligible(TimeWindow window, Active policy, Instant now) {
         window.singleDay();
         var settings = policy.settings();

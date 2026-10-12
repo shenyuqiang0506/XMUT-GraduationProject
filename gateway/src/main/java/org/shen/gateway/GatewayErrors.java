@@ -16,6 +16,10 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * 响应式网关的统一异常响应。
+ * 响应尚未提交时输出带 traceId 的受控错误；已提交时继续传播异常，避免重复写响应。
+ */
 @Component
 @Profile("business")
 @Order(-2)

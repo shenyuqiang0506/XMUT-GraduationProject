@@ -9,6 +9,11 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
+/**
+ * 登录请求的来源与账号双维度限流。
+ * Lua 脚本将计数和首次设置过期时间原子化，避免出现永久不失效的计数键。
+ * Redis 不可用时拒绝新登录；既有会话的有效性仍由数据库校验。
+ */
 @Component
 @Profile("business")
 public class LoginThrottle {
@@ -22,6 +27,10 @@ public class LoginThrottle {
         this.prefix = "auth:" + audience + ":login:";
     }
 
+    /**
+     * 同一来源每 60 秒最多 30 次，同一账号每 900 秒最多 10 次。
+     * 键中使用摘要而非原始账号或地址，前缀包含受众以隔离不同环境。
+     */
     public void check(String username, String peer) {
         try {
             Long ip = redis.execute(COUNT, List.of(prefix + "peer:" + TokenSecrets.hash(peer)), "60");

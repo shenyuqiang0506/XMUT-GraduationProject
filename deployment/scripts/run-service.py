@@ -7,6 +7,8 @@ import shlex
 
 REPO = Path(__file__).resolve().parents[2]
 
+# 读取本项目生成的环境文件，按第一个等号拆分，保留值内的等号。
+# 使用 shell 引号规则还原值，但不执行文件中的任何命令。
 def load_env(path):
     values = {}
     for line in path.read_text().splitlines():
@@ -15,6 +17,8 @@ def load_env(path):
             values[key] = shlex.split(value)[0] if value else ''
     return values
 
+# 按环境与服务构造最小化配置：共享验签公钥，签名私钥仅交给身份服务。
+# 业务数据的 REAL/DEMO 模式与这里的 dev/prod 部署环境是不同维度。
 def service_env(environment, service, bootstrap=False):
     private = REPO / 'deployment/secrets' / environment
     source = load_env(REPO / 'deployment' / ('.env.' + environment))
@@ -54,6 +58,7 @@ def main():
     if not jar.exists():
         raise SystemExit('Build the root Maven reactor first.')
     env = service_env(args.environment, args.service, args.bootstrap_admin)
+    # 以 Java 进程替换启动器，使终端信号和退出状态直接对应服务。
     os.execvpe('java', ['java', '-jar', str(jar)], env)
 
 if __name__ == '__main__':

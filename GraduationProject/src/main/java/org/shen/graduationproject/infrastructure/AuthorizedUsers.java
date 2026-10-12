@@ -16,6 +16,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+/**
+ * 配置资源管理员或审批组成员前，向身份服务核实目标账号资格。
+ * 两个业务库之间不直接跨库读取；透传当前操作者令牌，由身份接口执行权限校验。
+ * 只有有效的资源管理员或系统管理员可以被分配管理职责。
+ */
 @Component
 @Profile("business")
 public class AuthorizedUsers {

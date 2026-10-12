@@ -6,6 +6,11 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
 
+/**
+ * 高熵刷新凭据生成与摘要工具。
+ * 刷新凭据采用 32 字节安全随机数，使用无填充的 URL 安全 Base64 编码。
+ * SHA-256 用于随机令牌查找和请求指纹，不替代用户密码的 BCrypt 存储。
+ */
 public final class TokenSecrets {
     private static final SecureRandom RANDOM = new SecureRandom();
     private TokenSecrets() {}

@@ -6,10 +6,18 @@ import java.util.Set;
 
 import jakarta.validation.constraints.*;
 
+/**
+ * 目录写入的不可变输入契约。
+ * 来源编号采用字符串保留前导零；容量、面积允许 null，表示来源未给出而非零。
+ * 资源类型、来源可借用状态、平台生命周期和数据模式各有独立含义，不相互推导。
+ */
 public final class CatalogCommands {
     private CatalogCommands() {
     }
 
+    /**
+     * 完整资源写入模型。来源信息与平台状态分别记录，设备额外字段由应用层进行条件校验。
+     */
     public record Resource(
             @NotBlank @Pattern(regexp = "VENUE|EQUIPMENT") String resourceType,
             @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{1,32}") String sourceSystem,
@@ -30,6 +38,9 @@ public final class CatalogCommands {
     public record Group(@NotBlank @Size(max = 100) String name) {
     }
 
+    /**
+     * 以字符串用户 ID 集合整体替换成员；空集合表示清空，集合天然去重。
+     */
     public record Members(@NotNull @Size(max = 100) Set<@Pattern(regexp = "[1-9][0-9]{0,18}") String> userIds) {
     }
 }

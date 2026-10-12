@@ -14,6 +14,11 @@ import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Component;
 
+/**
+ * 身份服务专用的访问令牌签发器及创建账号幂等指纹生成器。
+ * 仅本服务持有签名私钥；JWT 不包含密码或角色列表，角色由业务请求时实时查询。
+ * 访问令牌最长 15 分钟，刷新凭据的生命周期由设备会话管理。
+ */
 @Component
 @Profile("business")
 public class AccessTokens {
@@ -42,6 +47,10 @@ public class AccessTokens {
         this.seconds = seconds;
     }
 
+    /**
+     * 为创建账号的幂等比较生成 HMAC 指纹。
+     * 指纹密钥由私钥材料派生，避免直接保存初始密码的普通快速摘要；轮换私钥会改变该指纹。
+     */
     public String passwordFingerprint(String password) {
         try {
             var mac = javax.crypto.Mac.getInstance("HmacSHA256");
@@ -55,6 +64,9 @@ public class AccessTokens {
     public record Tokens(String accessToken, String refreshToken, String tokenType, long expiresIn, String sessionId) {
     }
 
+    /**
+     * 签发包含用户 ID、会话 ID 和身份版本的 RS256 令牌；刷新原文仅交还本次调用方。
+     */
     public Tokens issue(AuthActor actor, String refresh) {
         Instant now = Instant.now();
         var claims = JwtClaimsSet.builder().issuer(issuer).subject(actor.userId()).audience(List.of(audience))

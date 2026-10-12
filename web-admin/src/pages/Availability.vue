@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/**
+ * 根据时间、人数、设施及设备需求查询可行组合，并查看资源日历。
+ * 结果是服务端检查时刻的快照，页面展示不会锁定资源或创建预约申请。
+ */
 import {ref, onMounted} from 'vue'
 import {api, explain} from '../api/client'
 import type {Resource, Page as ResourcePage} from '../types'
@@ -46,6 +50,7 @@ const featureOptions = [{code: 'PROJECTOR', label: '投影'}, {code: 'WHITEBOARD
   label: '音响'
 }, {code: 'NETWORK', label: '网络'}, {code: 'COMPUTER', label: '电脑'}, {code: 'MICROPHONE', label: '固定话筒'}, {code: 'DESK', label: '桌椅'}]
 
+// 把浏览器 Date 转为带 Z 偏移的 ISO 时间，避免服务端误把本地时刻当作 UTC。
 function range() {
   if (!start.value || !end.value) throw new Error('请选择开始和结束时间')
   // 发送明确的 UTC 偏移；服务器按上海自然日判断是否跨日。
@@ -69,6 +74,7 @@ async function more() {
 
 onMounted(loadResources)
 
+// 清除旧结果再查询，避免失败后仍把上一次方案当作本次结果。当前页面最多展示返回的前 100 套组合。
 async function search() {
   busy.value = true;
   error.value = '';
@@ -92,6 +98,7 @@ async function search() {
   }
 }
 
+// 使用同一查询窗口读取指定资源的日历，切换资源时清除旧日历，避免混淆覆盖证据。
 async function showCalendar(id = resourceId.value) {
   busy.value = true;
   error.value = '';
@@ -111,6 +118,7 @@ async function showCalendar(id = resourceId.value) {
   }
 }
 
+// 展示固定采用上海时区，与后端自然日规则一致，不随浏览器所在时区改变业务日期。
 function display(value: string) {
   return new Date(value).toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})
 }

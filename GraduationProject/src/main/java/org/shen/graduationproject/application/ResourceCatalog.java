@@ -17,6 +17,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * 资源目录应用服务，负责场地、设备、审批组及管理范围的维护。
+ * 来源可借用状态与平台开放状态分开保存；目录列表不计算具体时段可用性。
+ * 写操作由幂等执行器提供事务，资源修改还需行锁和 expectedVersion 防止覆盖并发变更。
+ */
 @Service
 @Profile("business")
 @RequiredArgsConstructor
@@ -28,6 +33,9 @@ public class ResourceCatalog {
     private final ObjectMapper json;
     private final Validator validator;
 
+    /**
+     * 校验资源字段及跨字段约束：设备需要资产信息，开放资源需要有效审批组，真实来源必须明确可借。
+     */
     public void validate(CatalogCommands.Resource input) {
         if (!validator.validate(input).isEmpty())
             throw new BusinessException(400, "VALIDATION_ERROR", "资源字段不符合要求");
@@ -39,16 +47,25 @@ public class ResourceCatalog {
             throw new BusinessException(422, "RESOURCE_NOT_OPENABLE", "开放资源必须绑定审批组，真实来源必须明确可借用");
     }
 
+    /**
+     * 读取内部原始记录；lock=true 用于事务内协调资源修改。此方法本身不检查访问范围，调用方负责授权。
+     */
     public Map<String, Object> raw(long id, boolean lock) {
         var rows = sql.queryForList("SELECT * FROM resource WHERE id=?" + (lock ? " FOR UPDATE" : ""), id);
         if (rows.isEmpty()) throw new BusinessException(404, "NOT_FOUND", "资源不存在或不可见");
         return rows.getFirst();
     }
 
+    /**
+     * 以来源系统、来源编号和数据模式构成目录身份，避免不同来源或测试资料互相覆盖。
+     */
     public Long find(String source, String sourceId, String mode) {
         return sql.queryForList("SELECT id FROM resource WHERE source_system=? AND source_id=? AND data_mode=?", Long.class, source, sourceId, mode).stream().findFirst().orElse(null);
     }
 
+    /**
+     * 显式挑选对外字段，ID 转为字符串。没有查询时间窗口时，已开放资源仍返回 UNKNOWN。
+     */
     public Map<String, Object> view(Map<String, Object> row) {
         var out = new LinkedHashMap<String, Object>();
         String[] columns = {"resource_type", "source_system", "source_id", "name", "campus", "building", "floor_no", "category", "subcategory", "capacity", "exam_capacity", "area", "source_borrowable", "platform_status", "data_mode", "remark", "version"};
@@ -79,6 +96,9 @@ public class ResourceCatalog {
         return result;
     }
 
+    /**
+     * 先应用当前用户可见范围，再拼接白名单筛选列；筛选值通过 JDBC 参数绑定传入。
+     */
     public Map<String, Object> list(AuthActor actor, int page, int size, Map<String, String> filters) {
         if (page < 1 || page > 100000 || size < 1 || size > 100)
             throw new BusinessException(400, "VALIDATION_ERROR", "分页参数无效");
@@ -115,6 +135,9 @@ public class ResourceCatalog {
         sql.update("INSERT INTO audit_log(actor_id,action,object_type,object_id,from_status,to_status,trace_id) VALUES (?,?,?,?,?,?,?)", Long.parseLong(actor.userId()), action, type, id, from, to, TraceIds.acceptOrCreate(MDC.get(TraceIds.MDC_KEY)));
     }
 
+    /**
+     * 整体维护设施属性及设备扩展字段，随外层资源写入事务共同提交。
+     */
     private void extras(long id, CatalogCommands.Resource input) {
         sql.update("DELETE FROM resource_feature WHERE resource_id=?", id);
         if (input.features() != null)
@@ -128,6 +151,9 @@ public class ResourceCatalog {
         }
     }
 
+    /**
+     * 创建资源及扩展记录；必须在外层事务中调用，保持自增 ID 查询与插入使用同一连接。
+     */
     public long insert(CatalogCommands.Resource r, Long batch, Map<String, Object> raw) {
         sql.update("INSERT INTO resource(resource_type,source_system,source_id,name,campus,building,floor_no,category,subcategory,capacity,exam_capacity,area,source_borrowable,platform_status,approval_group_id,data_mode,remark,raw_payload,import_batch_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 r.resourceType(), r.sourceSystem(), r.sourceId(), r.name(), r.campus(), r.building(), r.floorNo(), r.category(), r.subcategory(), r.capacity(), r.examCapacity(), r.area(), r.sourceBorrowable(), r.platformStatus(), r.approvalGroupId(), r.dataMode(), r.remark(), json.writeValueAsString(raw), batch);
@@ -136,12 +162,18 @@ public class ResourceCatalog {
         return id;
     }
 
+    /**
+     * 更新允许变化的目录字段并递增版本；资源类型、来源标识与数据模式保持原身份。
+     */
     public void update(long id, CatalogCommands.Resource r, Long batch, Map<String, Object> raw) {
         sql.update("UPDATE resource SET name=?,campus=?,building=?,floor_no=?,category=?,subcategory=?,capacity=?,exam_capacity=?,area=?,source_borrowable=?,platform_status=?,approval_group_id=?,remark=?,raw_payload=?,import_batch_id=?,version=version+1 WHERE id=?",
                 r.name(), r.campus(), r.building(), r.floorNo(), r.category(), r.subcategory(), r.capacity(), r.examCapacity(), r.area(), r.sourceBorrowable(), r.platformStatus(), r.approvalGroupId(), r.remark(), json.writeValueAsString(raw), batch, id);
         extras(id, r);
     }
 
+    /**
+     * 预检权限和字段后进入幂等事务再次检查，避免直接依赖提交前的界面状态。
+     */
     public CatalogIdempotency.Result create(AuthActor actor, String key, CatalogCommands.Resource input) {
         access.createInGroup(actor, input.approvalGroupId());
         validate(input);
@@ -158,6 +190,9 @@ public class ResourceCatalog {
         }
     }
 
+    /**
+     * 只接受白名单字段，在资源行锁内比较版本，然后将局部字段合并为完整资源重新校验。
+     */
     public CatalogIdempotency.Result patch(AuthActor actor, String key, long id, Map<String, Object> fields) {
         access.administrator(actor);
         access.manage(actor, id);
@@ -184,6 +219,7 @@ public class ResourceCatalog {
             } catch (RuntimeException invalid) {
                 throw new BusinessException(400, "VALIDATION_ERROR", "资源字段格式无效");
             }
+            // 更换审批组会改变管理边界，因此额外要求系统管理员权限。
             if (!Objects.equals(row.get("approval_group_id") == null ? null : row.get("approval_group_id").toString(), input.approvalGroupId()))
                 access.systemAdministrator(actor);
             validate(input);
@@ -194,6 +230,9 @@ public class ResourceCatalog {
         });
     }
 
+    /**
+     * 系统管理员查看全部审批组，资源管理员只查看自己属于的组；成员 ID 仍以字符串返回。
+     */
     public Map<String, Object> groups(AuthActor actor) {
         access.administrator(actor);
         String scope = access.system(actor) ? "" : " WHERE EXISTS(SELECT 1 FROM approval_group_member m WHERE m.group_id=g.id AND m.user_id=" + Long.parseLong(actor.userId()) + ")";
@@ -205,6 +244,9 @@ public class ResourceCatalog {
         return Map.of("items", rows);
     }
 
+    /**
+     * 创建有效审批组并记录审计；数据库唯一约束将重复名称转换为业务冲突。
+     */
     public CatalogIdempotency.Result createGroup(AuthActor actor, String key, CatalogCommands.Group input) {
         access.systemAdministrator(actor);
         try {
@@ -219,6 +261,10 @@ public class ResourceCatalog {
         }
     }
 
+    /**
+     * 同一实现维护审批组成员或资源直属管理员。
+     * 目标账号先通过身份服务检查；写事务锁定父记录后整体替换集合。表名由布尔分支固定选择，不来自请求字符串。
+     */
     public CatalogIdempotency.Result members(AuthActor actor, String key, long id, CatalogCommands.Members input, boolean resource) {
         access.systemAdministrator(actor);
         input.userIds().forEach(users::requireManager);

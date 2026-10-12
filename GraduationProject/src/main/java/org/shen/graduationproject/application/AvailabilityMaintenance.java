@@ -14,6 +14,11 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+/**
+ * 管理员维护开放规则及外部占用的应用服务。
+ * 每次写入均通过幂等事务，资源行作为同一资源写入的并发协调点。
+ * 占用登记只说明某个时段被使用，不自动生成来源完整覆盖证明。
+ */
 @Service
 @Profile("business")
 @RequiredArgsConstructor
@@ -25,6 +30,9 @@ public class AvailabilityMaintenance {
     private final AvailabilityQueries queries;
     private final BookingPolicies policies;
 
+    /**
+     * 替换某资源的整套开放规则。空列表表示移除规则；版本检查保护并发编辑，资源版本随规则更新递增。
+     */
     public CatalogIdempotency.Result opening(AuthActor actor, String key, long resource, OpeningRules input) {
         access.administrator(actor);
         access.manage(actor, resource);
@@ -58,6 +66,9 @@ public class AvailabilityMaintenance {
                 "active", ((Number) row.get("active")).intValue() == 1, "version", row.get("version"), "dataMode", row.get("data_mode"));
     }
 
+    /**
+     * 登记一条最多 31 天的外部占用；来源编号不能使用系统拆分片段的保留前缀。
+     */
     public CatalogIdempotency.Result create(AuthActor actor, String key, long resource, Occupancy input) {
         access.administrator(actor);
         access.manage(actor, resource);
@@ -82,6 +93,9 @@ public class AvailabilityMaintenance {
         }
     }
 
+    /**
+     * 仅允许当前资源管理范围内的管理员查看来源编号等维护信息，普通用户日历不使用此视图。
+     */
     public Map<String, Object> list(AuthActor actor, long resource, int page, int size) {
         access.administrator(actor);
         access.manage(actor, resource);
@@ -93,6 +107,9 @@ public class AvailabilityMaintenance {
         return Map.of("items", rows.stream().map(this::view).toList(), "page", page, "size", size, "total", total);
     }
 
+    /**
+     * 锁定资源后再锁定占用记录，验证版本再更新或停用；始终保留记录及审计，不做物理删除。
+     */
     public CatalogIdempotency.Result patch(AuthActor actor, String key, long id, OccupancyUpdate input) {
         access.administrator(actor);
         var owners = sql.queryForList("SELECT resource_id FROM external_occupancy WHERE id=?", Long.class, id);

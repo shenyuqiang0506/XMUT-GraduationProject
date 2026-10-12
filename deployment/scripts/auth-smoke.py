@@ -25,6 +25,7 @@ REPORT_DATE = datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()
 REPORT_DIR = REPO / '开发文档/docs/verification' / REPORT_DATE / 'business'
 
 
+# 统一发送 JSON 请求并保留 HTTP 状态和响应体，使失败路径也能进行断言。
 def request(url, method='GET', payload=None, token=None, trace=None, key=None, extra=None):
     headers = dict(extra or {})
     if token:
@@ -46,11 +47,13 @@ def request(url, method='GET', payload=None, token=None, trace=None, key=None, e
         return response.status, body, dict(response.headers)
 
 
+# 仅解码 JWT 载荷用于测试断言，不执行验签，不能用于业务身份认证。
 def claims(token):
     segment = token.split('.')[1]
     return json.loads(base64.urlsafe_b64decode(segment + '=' * (-len(segment) % 4)))
 
 
+# 使用测试配置中的私钥构造指定声明的令牌，验证服务端是否拒绝非法声明。
 def signed(private, payload, alg='RS256'):
     def encode(value):
         return base64.urlsafe_b64encode(json.dumps(value, separators=(',', ':')).encode()).rstrip(b'=')
@@ -66,6 +69,8 @@ def sql(query):
     return result.stdout.decode().strip()
 
 
+# 验证登录、刷新、角色与会话撤销等真实调用链；测试账号采用本轮独立前缀。
+# 故障场景仅影响本次启动的服务，清理时保留初始化管理员和迁移记录。
 def main():
     run_id = 'auth-' + uuid.uuid4().hex[:12]
     group = 'business-' + uuid.uuid4().hex[:12]

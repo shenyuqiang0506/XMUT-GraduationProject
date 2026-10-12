@@ -11,6 +11,10 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * test profile 下的预约服务基础装配验证。
+ * 查询测试数据库并确认 MyBatis、Redis、RabbitMQ 连接工厂已注入，不证明外部 Redis 或队列实际可达。
+ */
 @ActiveProfiles("test")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class GraduationProjectApplicationTests {

@@ -15,6 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * 资源目录的两阶段导入：先预览并保存原文件，再显式确认写库。
+ * 预览结果只用于展示；确认时重新读取文件、核验摘要并检查当前管理权限。
+ * 批次内任一资源失败都会回滚整批数据库变更，不删除文件之外的既有目录资源。
+ */
 @Service
 @Profile("business")
 @RequiredArgsConstructor
@@ -52,6 +57,9 @@ public class CatalogImports {
         }
     }
 
+    /**
+     * 系统管理员可查看所有批次；其他管理员只可读取自己的批次，隐藏他人批次是否存在。
+     */
     private Map<String, Object> batch(AuthActor actor, long id, boolean lock) {
         access.administrator(actor);
         var rows = sql.queryForList("SELECT * FROM import_batch WHERE id=?" + (lock ? " FOR UPDATE" : ""), id);
@@ -60,6 +68,9 @@ public class CatalogImports {
         return rows.getFirst();
     }
 
+    /**
+     * 只暴露批次摘要、映射和错误，不向客户端返回服务器文件存储路径。
+     */
     private Map<String, Object> view(Map<String, Object> row) {
         var result = new LinkedHashMap<String, Object>();
         result.put("batchId", row.get("id").toString());
@@ -78,12 +89,19 @@ public class CatalogImports {
         return view(batch(actor, id, false));
     }
 
+    /**
+     * 新来源资源检查所属审批组创建权限，已有资源检查当前管理范围；确认时也会重新执行。
+     */
     private void permitted(AuthActor actor, CatalogCommands.Resource resource) {
         Long existing = catalog.find(resource.sourceSystem(), resource.sourceId(), resource.dataMode());
         if (existing == null) access.createInGroup(actor, resource.approvalGroupId());
         else access.manage(actor, existing);
     }
 
+    /**
+     * 保存上传文件并解析每行，汇总新增、更新和阻断错误，但此时不写入资源目录。
+     * 目录以外的导入类型分派给时间数据导入服务。
+     */
     public CatalogIdempotency.Result preview(AuthActor actor, String key, MultipartFile file, String type, String source, String mode, String mappingText, String contextText) {
         if (!"RESOURCE_CATALOG".equals(type))
             return temporal.preview(actor, key, file, type, source, mode, mappingText, contextText);
@@ -127,6 +145,7 @@ public class CatalogImports {
                 catalog.audit(actor, "IMPORT_PREVIEW", "IMPORT_BATCH", id, null, "PREVIEWED");
                 return new CatalogIdempotency.Result(201, view(batch(actor, id, false)), false);
             });
+            // 幂等重试复用原批次，删除本次重复上传产生的新文件，避免无归属文件累积。
             if (outcome.replayed()) storage.delete(saved.key());
             return outcome;
         } catch (RuntimeException failure) {
@@ -135,6 +154,10 @@ public class CatalogImports {
         }
     }
 
+    /**
+     * 锁定批次并核验文件摘要、已保存映射和当前权限，按来源身份新增或更新资源。
+     * 批次标记、资源及审计共享幂等事务；错误或唯一约束冲突会整体回滚。
+     */
     public CatalogIdempotency.Result commit(AuthActor actor, String key, long id) {
         var initialBatch = batch(actor, id, false);
         if (!"RESOURCE_CATALOG".equals(initialBatch.get("import_type")))
@@ -155,7 +178,7 @@ public class CatalogImports {
                 var parsed = parser.parse(bytes, batch.get("file_storage_key").toString(), batch.get("source_system").toString(), batch.get("data_mode").toString(), group(context), mapping);
                 if (!parsed.errors().isEmpty())
                     throw new BusinessException(422, "IMPORT_HAS_ERRORS", "文件无法按已保存映射确认");
-                // Follow the resource-ID lock order used by subsequent reservation operations.
+                // 对已有资源按主键升序加锁，与其他资源写入保持一致，降低多资源交叉操作的死锁风险。
                 var ids = parsed.rows().stream().map(r -> catalog.find(r.resource().sourceSystem(), r.resource().sourceId(), r.resource().dataMode())).filter(Objects::nonNull).distinct().sorted().toList();
                 for (long resource : ids) catalog.raw(resource, true);
                 int inserted = 0, updated = 0;
@@ -178,6 +201,7 @@ public class CatalogImports {
                         if ("OPEN".equals(status) && "REAL".equals(input.dataMode()) && !"YES".equals(input.sourceBorrowable()))
                             status = "CLOSED";
                         fields.put("platformStatus", status);
+                        // 来源导入不能覆盖人工维护的设施、设备状态和审批组；已开放真实资源失去可借证明时会关闭。
                         var currentView = catalog.view(current);
                         fields.put("features", currentView.get("features"));
                         fields.put("conditionStatus", currentView.get("conditionStatus"));

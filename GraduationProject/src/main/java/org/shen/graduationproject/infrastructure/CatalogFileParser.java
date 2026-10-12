@@ -12,6 +12,11 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * Excel/JSON 资源目录解析器，只负责格式转换和逐行错误定位。
+ * 统计以文件实际数据行为准，不采信接口导出中的 totalResult 等分页总数。
+ * 显式映射优先于已知别名；未知容量保留 null，资源来源编号不主动转为数字。
+ */
 @Component
 @Profile("business")
 public class CatalogFileParser {
@@ -98,6 +103,7 @@ public class CatalogFileParser {
                     var header = sheet.getRow(0);
                     if (header == null || header.getLastCellNum() > 100)
                         throw new BusinessException(400, "INVALID_IMPORT_FILE", "Excel 表头无效");
+                    // 按 Excel 的显示格式读取值，可保留文本编号及带零格式；不对公式求值，导入只接收原始数据。
                     DataFormatter format = new DataFormatter(Locale.ROOT);
                     List<String> columns = new ArrayList<>();
                     Set<String> used = new HashSet<>();
@@ -144,6 +150,9 @@ public class CatalogFileParser {
         return s == null || s.isEmpty() ? null : s;
     }
 
+    /**
+     * 用精确整数转换拒绝小数和溢出；空值保留未知，非负约束由后续资源校验执行。
+     */
     private Integer integer(Object value, String field) {
         String s = optional(value);
         if (s == null) return null;
@@ -164,6 +173,9 @@ public class CatalogFileParser {
         }
     }
 
+    /**
+     * 建立字段映射后逐行标准化；每行保留来源行号，允许预览一次列出多行错误。
+     */
     public Parsed parse(byte[] bytes, String key, String source, String mode, String group, Map<String, String> override) {
         List<Source> sources = readRows(bytes, key, false);
         Set<String> columns = new HashSet<>();
@@ -204,6 +216,7 @@ public class CatalogFileParser {
                 var input = new CatalogCommands.Resource(optional(values.get("resourceType")) == null ? "VENUE" : text(values.get("resourceType")), source, id, optional(values.get("name")),
                         optional(values.get("campus")), optional(values.get("building")), optional(values.get("floorNo")), optional(values.get("category")), optional(values.get("subcategory")),
                         integer(values.get("capacity"), "capacity"), integer(values.get("examCapacity"), "examCapacity"), decimal(values.get("area")), borrow, "DRAFT", group, mode, optional(values.get("remark")), Map.of(), optional(values.get("assetCode")), optional(values.get("equipmentType")), "GOOD");
+                // 原始行只保留白名单字段及简单值，避免将 cookie、token 等无关敏感列写入资源扩展数据。
                 var raw = new LinkedHashMap<String, Object>();
                 Set<String> allowed = new HashSet<>(mapping.values());
                 ALIASES.values().forEach(allowed::addAll);

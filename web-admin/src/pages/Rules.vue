@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/**
+ * 授权管理员维护开放规则、外部占用及预约策略的页面。
+ * 规则与占用沿用资源版本，策略按 REAL/DEMO 独立版本；真实规则不预填制度参数。
+ */
 import {ref, reactive, onMounted} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
@@ -72,6 +76,7 @@ async function more() {
   await loadResources()
 }
 
+// 切换资源时清空上一资源的规则、占用及分页，再读取详情和占用，避免混用版本号。
 async function loadResource() {
   error.value = '';
   detail.value = undefined;
@@ -101,6 +106,7 @@ async function moreOccupancies() {
   finally { busy.value = false }
 }
 
+// 切换策略范围先清空全部参数；只接受仍属于当前范围的响应，防止异步返回顺序覆盖新选择。
 async function loadPolicy() {
   error.value = ''
   policyLoading.value = true
@@ -128,6 +134,7 @@ onMounted(async () => {
   await loadPolicy()
 })
 
+// 一次替换整套规则并带资源版本，成功后重新读取服务器递增后的版本。
 async function saveRules() {
   if (!detail.value) return;
   busy.value = true;
@@ -145,6 +152,7 @@ async function saveRules() {
   }
 }
 
+// 只在登记成功后生成新的来源编号；失败重试沿用编号和幂等键，避免重复登记同一占用。
 async function addOccupancy() {
   busy.value = true;
   error.value = ''
@@ -169,6 +177,7 @@ async function addOccupancy() {
   }
 }
 
+// 通过 active=false 停用记录，保留原区间、原因和版本供服务器校验，不物理删除历史。
 async function disable(row: Occupancy) {
   busy.value = true;
   error.value = ''
@@ -191,6 +200,7 @@ async function disable(row: Occupancy) {
   }
 }
 
+// 全部参数和制度依据均需明确填写，创建新版本后重新加载生效策略。
 async function savePolicy() {
   busy.value = true;
   error.value = ''
@@ -208,6 +218,7 @@ async function savePolicy() {
   }
 }
 
+// 这里只生成待编辑行，日期仍为空；管理员核实并保存前不会形成实际开放规则。
 function addRule() {
   rules.value.push({
     weekday: 1,

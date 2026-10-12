@@ -13,6 +13,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 账号管理及跨服务用户查询入口。
+ * 外部账号管理需系统管理员权限；内部查询仅返回状态和角色，不返回密码摘要。
+ * 写接口传递幂等键和版本号，由应用层在事务中执行最终校验。
+ */
 @RestController
 @Profile("business")
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -20,6 +25,9 @@ class UsersController {
     private final UserAdministration users;
     private final org.shen.identity.infrastructure.IdentityRepository repo;
 
+    /**
+     * 向有权管理的内部调用方返回目标用户状态和角色，用于校验管理员资格。
+     */
     @GetMapping("/internal/auth/users/{id}")
     ApiResponse<?> internalUser(@PathVariable long id) {
         var user = repo.user(id, false);
@@ -32,12 +40,18 @@ class UsersController {
                 .header("Cache-Control", "no-store").body(ApiResponse.success(result.data(), MDC.get(TraceIds.MDC_KEY)));
     }
 
+    /**
+     * 创建账号，初始密码只作为输入，响应不会回传密码或其摘要。
+     */
     @PostMapping("/users")
     ResponseEntity<?> create(@AuthenticationPrincipal AuthActor actor,
                              @RequestHeader("Idempotency-Key") String key, @Valid @RequestBody AuthCommands.CreateUser request) {
         return response(users.create(actor, key, request));
     }
 
+    /**
+     * 按账号和状态分页查询，最终系统管理员权限由应用层再次检查。
+     */
     @GetMapping("/users")
     ApiResponse<?> list(@AuthenticationPrincipal AuthActor actor,
                         @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
@@ -45,12 +59,18 @@ class UsersController {
         return ApiResponse.success(users.list(actor, page, size, username, status), MDC.get(TraceIds.MDC_KEY));
     }
 
+    /**
+     * 带身份预期版本启停账号，成功变更会撤销旧会话。
+     */
     @PatchMapping("/users/{id}/status")
     ResponseEntity<?> status(@AuthenticationPrincipal AuthActor actor,
                              @RequestHeader("Idempotency-Key") String key, @PathVariable long id, @Valid @RequestBody AuthCommands.Status request) {
         return response(users.status(actor, key, id, request));
     }
 
+    /**
+     * 整体替换角色集合并撤销旧会话，服务端保护最后一个有效系统管理员。
+     */
     @PutMapping("/users/{id}/roles")
     ResponseEntity<?> roles(@AuthenticationPrincipal AuthActor actor,
                             @RequestHeader("Idempotency-Key") String key, @PathVariable long id, @Valid @RequestBody AuthCommands.Roles request) {

@@ -21,6 +21,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+/**
+ * 显式启用后才运行的本机 dev 基础设施集成测试。
+ * 使用真实 MySQL、Redis、RabbitMQ 和 Nacos；只创建带随机标识的临时对象并清理。
+ * 这些检查验证连通与基础事务，不替代多资源预约并发或消息恢复验收。
+ */
 @EnabledIfEnvironmentVariable(named = "XMUT_INFRA_TEST", matches = "true")
 @ActiveProfiles("dev")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -32,6 +37,9 @@ class InfrastructureIT {
     @Autowired DiscoveryClient discovery;
     @Autowired Environment environment;
 
+    /**
+     * 新建随机临时 InnoDB 表，主动回滚一条插入并确认无记录；finally 仅删除本次表。
+     */
     @Test
     void mysqlUsesRealInnoDbAndRollsBack() {
         assertThat(jdbc.queryForObject("SELECT @@version", String.class)).startsWith("8.4.");
@@ -50,6 +58,9 @@ class InfrastructureIT {
         }
     }
 
+    /**
+     * 写带随机名和短 TTL 的测试键，验证认证及读写后清理，避免污染既有缓存。
+     */
     @Test
     void redisAuthenticatesAndRoundTrips() {
         String key = "xmut:dev:smoke:" + UUID.randomUUID();
@@ -61,6 +72,9 @@ class InfrastructureIT {
         }
     }
 
+    /**
+     * 使用非持久、独占、自动删除的临时队列验证收发，不使用任何业务队列。
+     */
     @Test
     void rabbitAuthenticatesAndRoundTripsInDevVhost() {
         var admin = new RabbitAdmin(rabbit.getConnectionFactory());
@@ -74,6 +88,9 @@ class InfrastructureIT {
         }
     }
 
+    /**
+     * 同时核实导入的 dev 环境标记和服务注册；注册是异步行为，因此使用有限等待。
+     */
     @Test
     void nacosImportsConfigAndRegistersService() {
         assertThat(environment.getProperty("platform.environment")).isEqualTo("dev");

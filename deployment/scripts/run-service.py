@@ -28,7 +28,8 @@ def service_env(environment, service, bootstrap=False):
     # Keep credentials explicitly scoped even if the parent shell sourced another service's env.
     for key in ['JWT_PRIVATE_KEY_PATH','AUTH_PASSWORD_FINGERPRINT_KEY_PATH','AUTH_ADMIN_USERNAME','AUTH_ADMIN_PASSWORD',
                 'IDENTITY_DB_URL','IDENTITY_DB_USERNAME','IDENTITY_DB_PASSWORD',
-                'DB_USERNAME','DB_PASSWORD','REDIS_PASSWORD','RABBITMQ_USERNAME','RABBITMQ_PASSWORD']:
+                'DB_USERNAME','DB_PASSWORD','DB_URL','REDIS_HOST','REDIS_PORT','REDIS_PASSWORD','RABBITMQ_HOST','RABBITMQ_PORT','RABBITMQ_VHOST','RABBITMQ_USERNAME','RABBITMQ_PASSWORD',
+                'SERVICE_CALL_KEY_PATH','NOTIFICATION_DB_URL','NOTIFICATION_DB_USERNAME','NOTIFICATION_DB_PASSWORD']:
         env.pop(key,None)
     env.update(load_env(private / 'auth.env'))
     env.update({key: source[key] for key in ['NACOS_USERNAME', 'NACOS_PASSWORD']})
@@ -40,10 +41,14 @@ def service_env(environment, service, bootstrap=False):
             env.pop('AUTH_ADMIN_PASSWORD', None)
     elif service == 'booking-service':
         env.update(load_env(private / 'backend.env'))
+    elif service == 'notification-service':
+        env.update(load_env(private / 'notification.env'))
     elif service == 'gateway':
         # 网关只领取限流所需的 Redis 凭据，不领取数据库、签名私钥或管理员密码。
         env.update(REDIS_HOST='127.0.0.1', REDIS_PORT='6379' if environment == 'dev' else '16379',
                    REDIS_PASSWORD=source['REDIS_PASSWORD'])
+    if service in ['identity-service','booking-service']:
+        env['SERVICE_CALL_KEY_PATH']=str(private/'booking-service-call.key')
     env['SPRING_PROFILES_ACTIVE'] = environment + ',business' + (',bootstrap-admin' if bootstrap else '')
     env['SERVER_ADDRESS'] = '127.0.0.1'
     return env
@@ -52,7 +57,7 @@ def service_env(environment, service, bootstrap=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('environment', choices=['dev', 'prod'])
-    parser.add_argument('service', choices=['identity-service', 'booking-service', 'gateway', 'ai-service'])
+    parser.add_argument('service', choices=['identity-service', 'booking-service', 'gateway', 'ai-service','notification-service'])
     parser.add_argument('--bootstrap-admin', action='store_true')
     args = parser.parse_args()
     if args.bootstrap_admin and (args.environment != 'dev' or args.service != 'identity-service'):

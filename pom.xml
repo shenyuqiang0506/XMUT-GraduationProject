@@ -103,6 +103,7 @@
         <module>security-core</module>
         <module>service-support</module>
         <module>identity-service</module>
+        <module>notification-service</module>
         <module>GraduationProject</module>
         <module>ai-service</module>
         <module>gateway</module>

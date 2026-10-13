@@ -32,22 +32,14 @@ public class Applications {
     private final CatalogAccess access;
     private final AuthorizedApplicants applicants;
     private final ObjectMapper json;
+    private final ApplicantQuota quota;
+    private final WaitlistPriority priority;
 
     private long number(Object value) { return ((Number) value).longValue(); }
 
     /** 编号、时区和集合顺序规范化，避免相同组合仅因数组顺序变化而产生不同幂等指纹。 */
     private Create normalize(Create input) {
-        var equipment = input.equipmentIds() == null ? List.<String>of() : input.equipmentIds();
-        long venue = CatalogAccess.id(input.venueId());
-        var ids = equipment.stream().map(CatalogAccess::id).sorted().toList();
-        if (new HashSet<>(ids).size() != ids.size() || ids.contains(venue))
-            throw new BusinessException(400, "VALIDATION_ERROR", "场地和设备编号不能重复");
-        var window = TimeWindow.of(input.startAt(), input.endAt());
-        window.singleDay();
-        return new Create(input.activityName().trim(), input.description() == null ? null : input.description().trim(),
-                input.participantCount(), window.start().atOffset(ZoneOffset.UTC), window.end().atOffset(ZoneOffset.UTC),
-                Long.toString(venue), ids.stream().map(Object::toString).toList(),
-                input.requiredFeatures() == null ? new TreeSet<>() : new TreeSet<>(input.requiredFeatures()));
+        return ApplicationRequests.normalize(input);
     }
 
     public CatalogIdempotency.Result create(AuthActor actor, String key, Create request) {
@@ -56,8 +48,7 @@ public class Applications {
         return idempotency.execute(actor, "APPLICATION_CREATE", key, input, () -> {
             long uid = CatalogAccess.id(actor.userId()), venue = CatalogAccess.id(input.venueId());
             // 稳定用户守卫使两个不同组合的并发提交也不能超过同一用户配额。
-            sql.update("INSERT INTO applicant_guard(user_id) VALUES (?) ON DUPLICATE KEY UPDATE user_id=user_id", uid);
-            sql.queryForObject("SELECT user_id FROM applicant_guard WHERE user_id=? FOR UPDATE", Long.class, uid);
+            quota.lock(uid);
             var ids = new TreeSet<Long>(); ids.add(venue);
             input.equipmentIds().forEach(id -> ids.add(CatalogAccess.id(id)));
             var members = List.copyOf(ids);
@@ -71,12 +62,20 @@ public class Applications {
             Instant now = policies.now();
             policies.eligible(window, policy, now);
             lifecycle.expireForResources(members, actor);
-            long active = sql.queryForObject("SELECT COUNT(*) FROM activity_application WHERE applicant_id=? AND (status='CONFLICT_REVIEW' OR (status='APPROVED' AND end_at>UTC_TIMESTAMP(3)) OR (status='PENDING_APPROVAL' AND hold_expires_at>UTC_TIMESTAMP(3)))", Long.class, uid);
-            if (active >= policy.settings().maxActiveApplicationsPerUser())
-                throw new BusinessException(422, "APPLICATION_LIMIT_REACHED", "已达到有效申请额度，请先查看已有申请");
+            quota.requireSpace(uid,policy.settings().maxActiveApplicationsPerUser(),null);
+            priority.requireNoQueue(members,window,mode);
             Long group = place.get("approval_group_id") == null ? null : number(place.get("approval_group_id"));
             var rows = lifecycle.validate(members, venue, input.participantCount(), input.requiredFeatures(), mode, group, window, policy, null);
             Instant hold = ApplicationRules.holdUntil(policies.now(), window.start(), policy.settings().pendingApprovalTtlMinutes(), policy.settings().bookingLeadMinutes());
+            long id=persist(actor,input,rows,mode,group,policy,hold,null);
+            return new CatalogIdempotency.Result(201, detail(actor, id), false);
+        });
+    }
+
+    /** 调用方已完成全组锁定、资格/额度和来源校验；确认 offer 时在此事务原子转交占用。 */
+    public long persist(AuthActor actor,Create input,List<Map<String,Object>> rows,String mode,long group,
+            BookingPolicies.Active policy,Instant hold,Long offerId) {
+            long uid=CatalogAccess.id(actor.userId());var window=TimeWindow.of(input.startAt(),input.endAt());
             var applicant = Map.of("userId", actor.userId(), "username", actor.username(), "displayName", actor.displayName());
             sql.update("INSERT INTO activity_application(applicant_id,activity_name,description,participant_count,start_at,end_at,status,approval_group_id,hold_expires_at,policy_version,policy_snapshot,applicant_snapshot,required_features,data_mode) VALUES (?,?,?,?,?,?,'PENDING_APPROVAL',?,?,?,?,?,?,?)",
                     uid, input.activityName(), input.description(), input.participantCount(), Timestamp.from(window.start()), Timestamp.from(window.end()),
@@ -89,13 +88,16 @@ public class Applications {
                 snapshot.put("resourceType",resource.get("resource_type")); snapshot.put("campus",resource.get("campus"));
                 snapshot.put("equipmentType",resource.get("equipment_type")); snapshot.put("sourceId",resource.get("source_id"));
                 sql.update("INSERT INTO application_resource(application_id,resource_id,resource_snapshot) VALUES (?,?,?)", id, resource.get("id"), json.writeValueAsString(snapshot));
-                sql.update("INSERT INTO resource_occupancy(resource_id,application_id,start_at,end_at,status,expires_at) VALUES (?,?,?,?,'HOLD',?)",
+                if(offerId==null)sql.update("INSERT INTO resource_occupancy(resource_id,application_id,start_at,end_at,status,expires_at) VALUES (?,?,?,?,'HOLD',?)",
                         resource.get("id"), id, Timestamp.from(window.start()), Timestamp.from(window.end()), Timestamp.from(hold));
+            }
+            if(offerId!=null) {
+                int transferred=sql.update("UPDATE resource_occupancy SET application_id=?,waitlist_entry_id=NULL,waitlist_group_id=NULL,expires_at=? WHERE waitlist_entry_id=? AND status='HOLD'",id,Timestamp.from(hold),offerId);
+                if(transferred!=rows.size())throw new IllegalStateException("候补占用成员转交数量不一致");
             }
             var row = lifecycle.row(id, false);
             lifecycle.event(row, "APPLICATION_SUBMITTED", actor, null);
-            return new CatalogIdempotency.Result(201, detail(actor, id), false);
-        });
+            return id;
     }
 
     private List<String> actions(AuthActor actor, Map<String,Object> row) {

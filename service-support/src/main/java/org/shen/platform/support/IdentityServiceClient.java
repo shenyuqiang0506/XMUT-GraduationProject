@@ -31,13 +31,19 @@ public final class IdentityServiceClient {
     }
 
     public <T> T get(String path, String token, ParameterizedTypeReference<T> type) {
+        return getWithHeaders(path, () -> java.util.Map.of("Authorization","Bearer "+token), type);
+    }
+
+    /** 每次故障转移重新生成服务签名 nonce，响应丢失时也不会把前一次签名重放到另一实例。 */
+    public <T> T getWithHeaders(String path, java.util.function.Supplier<java.util.Map<String,String>> headers,
+            ParameterizedTypeReference<T> type) {
         var instances = discovery.getInstances("identity-service").stream().map(i -> i.getUri()).distinct().toList();
         if (instances.isEmpty()) throw new BusinessException(503, "SERVICE_UNAVAILABLE", "身份服务暂不可用");
         int start = Math.floorMod(cursor.getAndIncrement(), instances.size());
         for (int attempt = 0; attempt < Math.min(2, instances.size()); attempt++) {
             try {
                 return http.get().uri(instances.get((start + attempt) % instances.size()) + path)
-                        .header("Authorization", "Bearer " + token)
+                        .headers(h -> headers.get().forEach(h::set))
                         .header(TraceIds.HEADER, TraceIds.acceptOrCreate(MDC.get(TraceIds.MDC_KEY)))
                         .retrieve().body(type);
             } catch (RestClientResponseException failure) {

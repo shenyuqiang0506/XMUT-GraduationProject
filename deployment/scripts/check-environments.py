@@ -54,10 +54,18 @@ for env in ['dev','prod']:
         path=private/name
         assert stat.S_IMODE(path.stat().st_mode)==0o600
         subprocess.run(['git','check-ignore','--quiet',str(path)],cwd=ROOT,check=True)
+    service_key=private/'booking-service-call.key'
+    assert len(service_key.read_bytes())==32 and stat.S_IMODE(service_key.stat().st_mode)==0o600
+    for path in [service_key,private/'notification.env']:
+        subprocess.run(['git','check-ignore','--quiet',str(path)],cwd=ROOT,check=True)
+        assert stat.S_IMODE(path.stat().st_mode)==0o600
+    notification=runtime.service_env(env,'notification-service')
+    assert notification['NOTIFICATION_DB_USERNAME']==values[env]['NOTIFICATION_DB_USER']
+    assert 'DB_PASSWORD' not in notification and 'REDIS_PASSWORD' not in notification and 'SERVICE_CALL_KEY_PATH' not in notification
     assert auth[env]['JWT_ISSUER']=='urn:xmut:'+env+':identity'
     assert auth[env]['JWT_AUDIENCE']=='xmut-'+env+'-api'
     assert Path(auth[env]['IMPORT_STORAGE_DIR']).parent==private
-    for service in ['booking-service','gateway','ai-service']:
+    for service in ['booking-service','gateway','ai-service','notification-service']:
         child=runtime.service_env(env,service)
         assert 'JWT_PRIVATE_KEY_PATH' not in child and 'AUTH_ADMIN_PASSWORD' not in child and 'IDENTITY_DB_PASSWORD' not in child
         assert 'AUTH_PASSWORD_FINGERPRINT_KEY_PATH' not in child
@@ -67,4 +75,5 @@ assert auth['dev']['JWT_PUBLIC_KEY_PATH']!=auth['prod']['JWT_PUBLIC_KEY_PATH']
 assert (ROOT/'secrets/dev/jwt-public.pem').read_bytes()!=(ROOT/'secrets/prod/jwt-public.pem').read_bytes()
 print('PASS: independent dev/prod JWT keys, issuer, audience and import directories; private signing key stays in identity service.')
 assert fingerprints['dev']!=fingerprints['prod']
+assert (ROOT/'secrets/dev/booking-service-call.key').read_bytes()!=(ROOT/'secrets/prod/booking-service-call.key').read_bytes()
 print('PASS: independent password fingerprint keys stay private to identity; gateway only receives its own Redis credential.')

@@ -43,6 +43,8 @@ class Stack:
         # 这些值只进入临时服务，不改动日常 dev/prod 配置。
         if name=='gateway':
             env.update(BUSINESS_RATE_GENERAL='1000', BUSINESS_RATE_SEARCH='200', BUSINESS_RATE_IMPORT='200')
+        # 旧阶段回归保持事件 PENDING，不发送通知；M4 验收显式开启并使用独立 audience。
+        env.update(BOOKING_OUTBOX_ENABLED='false',BOOKING_ADOPT_LEGACY_EVENTS='false',WAITLIST_SCHEDULING_ENABLED='false')
         env.update(overrides or {})
         logs=PRIVATE/(self.label+'-logs');logs.mkdir(mode=0o700,exist_ok=True)
         # 同一轮可能额外启动故障配置网关，保留各实例日志，不能截断正在运行实例的日志。

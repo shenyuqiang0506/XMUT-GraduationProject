@@ -57,9 +57,10 @@ class GatewayBusinessConfiguration {
     RouteLocator businessRoutes(RouteLocatorBuilder builder) {
         return builder.routes()
                 .route("identity", r -> r.path("/api/v1/auth/**", "/api/v1/users/**").filters(f -> f.stripPrefix(2)).uri("lb://identity-service"))
+                .route("notifications", r -> r.path("/api/v1/notifications/**","/api/v1/admin/notifications/**").filters(f -> f.stripPrefix(2)).uri("lb://notification-service"))
                 .route("booking-catalog", r -> r.path("/api/v1/resources/**", "/api/v1/availability/**", "/api/v1/admin/resources/**",
                                 "/api/v1/admin/imports/**", "/api/v1/admin/approval-groups/**", "/api/v1/admin/policies/**", "/api/v1/admin/external-occupancies/**",
-                                "/api/v1/applications/**", "/api/v1/admin/applications/**")
+                                "/api/v1/applications/**", "/api/v1/admin/applications/**", "/api/v1/waitlists/**", "/api/v1/admin/outbox/**")
                         .filters(f -> f.stripPrefix(2)).uri("lb://booking-service")).build();
     }
 }

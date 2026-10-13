@@ -27,6 +27,7 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class ResourceCatalog {
     private final BookingWriteCoordinator coordinator;
+    private final ResourceViewCache cache;
     private final JdbcTemplate sql;
     private final CatalogAccess access;
     private final CatalogIdempotency idempotency;
@@ -67,7 +68,9 @@ public class ResourceCatalog {
     /**
      * 显式挑选对外字段，ID 转为字符串。没有查询时间窗口时，已开放资源仍返回 UNKNOWN。
      */
-    public Map<String, Object> view(Map<String, Object> row) {
+    public Map<String, Object> view(Map<String, Object> row) {return cache.get(row,() -> freshView(row));}
+
+    private Map<String,Object> freshView(Map<String,Object> row) {
         var out = new LinkedHashMap<String, Object>();
         String[] columns = {"resource_type", "source_system", "source_id", "name", "campus", "building", "floor_no", "category", "subcategory", "capacity", "exam_capacity", "area", "source_borrowable", "platform_status", "data_mode", "remark", "version"};
         String[] names = {"resourceType", "sourceSystem", "sourceId", "name", "campus", "building", "floorNo", "category", "subcategory", "capacity", "examCapacity", "area", "sourceBorrowable", "platformStatus", "dataMode", "remark", "version"};

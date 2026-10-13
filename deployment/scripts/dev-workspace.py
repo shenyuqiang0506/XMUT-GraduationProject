@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start/stop this repository's local M2 dev processes; never deploy prod."""
+"""Start/stop this repository's local business dev processes; never deploy prod."""
 import argparse
 import importlib.util
 import json
@@ -76,7 +76,7 @@ def main():
     if args.action=='stop':stop(live);print('Stopped only recorded, identity-checked dev process groups. Docker was not stopped.');return
     if live:raise SystemExit('Recorded dev processes already exist; use status/stop before starting.')
     # 启动前检查全部端口；若被占用则退出，不接管或结束其他程序。
-    services=[('identity-service',8083),('booking-service',8082),('gateway',8081),('web-admin',5173)]
+    services=[('identity-service',8083),('booking-service',8082),('gateway',8081),('notification-service',8085),('web-admin',5173)]
     for _,port in services:
         with socket.socket() as probe:
             if probe.connect_ex(('127.0.0.1',port))==0:raise SystemExit('Dev port occupied; no existing process was stopped.')

@@ -44,7 +44,7 @@ def main():
         login = request('POST', '/v3/auth/user/login', login_fields)
     token = login['accessToken']
     # 仅发布不含密钥的环境标记；已存在配置必须保留正确标记，写入后再回读核对。
-    for data_id in ['GraduationProject.properties', 'booking-service.properties', 'identity-service.properties', 'ai-service.properties', 'gateway.properties']:
+    for data_id in ['GraduationProject.properties', 'booking-service.properties', 'identity-service.properties', 'ai-service.properties', 'gateway.properties','notification-service.properties']:
         fields = {'dataId': data_id, 'groupName': 'DEFAULT_GROUP', 'namespaceId': 'public'}
         expected = f'platform.environment={env}\n'
         try:

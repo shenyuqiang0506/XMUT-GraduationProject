@@ -171,7 +171,7 @@ def main():
                 env=os.environ.copy();env.update(TEST_ADMIN_USERNAME=private['AUTH_ADMIN_USERNAME'],TEST_ADMIN_PASSWORD=private['AUTH_ADMIN_PASSWORD'],TEST_MANAGER_USERNAME=prefix+'_manager',TEST_STUDENT_USERNAME=prefix+'_student',TEST_USER_PASSWORD=password,TEST_PREFIX=prefix,TEST_SOURCE=source,TEST_GROUP=ga)
                 fd=os.open(s.PRIVATE/'web-test.log',os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
                 with os.fdopen(fd,'w') as log:
-                    result=subprocess.run(['npm','test'],cwd=s.REPO/'web-admin',env=env,stdout=log,stderr=subprocess.STDOUT)
+                    result=subprocess.run(['npm','test','--','tests/business.spec.ts'],cwd=s.REPO/'web-admin',env=env,stdout=log,stderr=subprocess.STDOUT)
                 assert result.returncode==0,'Web acceptance failed; inspect private web-test.log (redact credentials before output).'
                 record('Real browser acceptance: login, role routes, resource mutation, preview/commit, one refresh for concurrent 401s')
             destination=s.auth.REPORT_DIR;destination.mkdir(parents=True,exist_ok=True)

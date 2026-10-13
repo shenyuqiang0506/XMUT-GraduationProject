@@ -7,6 +7,9 @@ import {ref, reactive, onMounted} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
 import {useSession} from '../stores/session'
+import {usePagedOptions} from '../composables/usePagedOptions'
+import ShanghaiDateTime from '../components/ShanghaiDateTime.vue'
+import {shanghaiRange} from '../utils/time'
 import type {Resource, Page} from '../types'
 
 interface OpeningRule {
@@ -40,11 +43,11 @@ interface Policy {
   basis?: string
 }
 
-const session = useSession(), keys = mutationKeys(), resources = ref<Resource[]>([]), resourceId = ref(''),
+const session = useSession(), keys = mutationKeys(), resourceId = ref(''),
     detail = ref<Detail>()
-const resourcePage = ref(1), resourceTotal = ref(0), rules = ref<OpeningRule[]>([]), occupancies = ref<Occupancy[]>([]),
+const rules = ref<OpeningRule[]>([]), occupancies = ref<Occupancy[]>([]),
     error = ref(''), busy = ref(false)
-const source = ref('MANUAL'), sourceKey = ref<string>(crypto.randomUUID()), start = ref<Date>(), end = ref<Date>(),
+const source = ref('MANUAL'), sourceKey = ref<string>(crypto.randomUUID()), start = ref(''), end = ref(''),
     reason = ref('MAINTENANCE')
 const occupancyPage = ref(1), occupancyTotal = ref(0), policyLoading = ref(false)
 // 日常业务默认使用真实来源；测试资料必须显式选择隔离模式。
@@ -61,18 +64,16 @@ const fields = [
   {key: 'coverageFreshnessMinutes', label: '来源覆盖有效时长（分钟）', min: 1, max: 10080}
 ]
 
+const {items: resources, loading: resourceLoading, hasMore: resourceHasMore, more: loadNextResourcePage} =
+    usePagedOptions<Resource>(page => api<Page<Resource>>('/resources?size=100&page=' + page))
+
 async function loadResources() {
-  try {
-    const data = await api<Page<Resource>>('/resources?size=100&page=' + resourcePage.value);
-    resources.value.push(...data.items);
-    resourceTotal.value = data.total
-  } catch (e) {
-    error.value = explain(e)
-  }
+  try { await loadNextResourcePage() }
+  catch (e) { error.value = explain(e) }
 }
 
 async function more() {
-  resourcePage.value++;
+  error.value = ''
   await loadResources()
 }
 
@@ -100,6 +101,7 @@ async function loadOccupancies() {
 }
 
 async function moreOccupancies() {
+  if (busy.value) return
   busy.value = true
   try { occupancyPage.value++; await loadOccupancies() }
   catch (e) { occupancyPage.value--; error.value = explain(e) }
@@ -154,6 +156,7 @@ async function saveRules() {
 
 // 只在登记成功后生成新的来源编号；失败重试沿用编号和幂等键，避免重复登记同一占用。
 async function addOccupancy() {
+  if (busy.value) return
   busy.value = true;
   error.value = ''
   try {
@@ -161,8 +164,7 @@ async function addOccupancy() {
     const payload = {
       sourceSystem: source.value,
       sourceKey: sourceKey.value,
-      startAt: start.value.toISOString(),
-      endAt: end.value.toISOString(),
+      ...shanghaiRange(start.value, end.value),
       reasonCode: reason.value
     }
     await api('/admin/resources/' + resourceId.value + '/external-occupancies', 'POST', payload, keys.key('occupancy:' + resourceId.value, payload));
@@ -244,7 +246,7 @@ function display(value: string) {
         <el-select v-model="resourceId" :disabled="busy" filterable @change="loadResource">
           <el-option v-for="r in resources" :key="r.id" :label="r.name+' · '+r.dataMode" :value="r.id"/>
         </el-select>
-        <el-button v-if="resources.length<resourceTotal" @click="more">加载更多资源</el-button>
+        <el-button v-if="resourceHasMore" :loading="resourceLoading" :disabled="busy" @click="more">加载更多资源</el-button>
       </el-form-item>
     </el-form>
   </div>
@@ -283,7 +285,8 @@ function display(value: string) {
     <el-button type="primary" :loading="busy" @click="saveRules">保存开放规则</el-button>
   </div>
   <div v-if="detail" class="card"><h2>外部占用（上海时间）</h2>
-    <el-form label-position="top" @submit.prevent="addOccupancy">
+    <el-form label-position="top" :disabled="busy" @submit.prevent="addOccupancy">
+      <p class="small">占用起止时刻按上海时间（UTC+08:00）填写。</p>
       <div class="twocol">
         <el-form-item label="占用来源">
           <el-input v-model="source" maxlength="32"/>
@@ -292,10 +295,10 @@ function display(value: string) {
           <el-input v-model="sourceKey" maxlength="128"/>
         </el-form-item>
         <el-form-item label="占用开始">
-          <el-date-picker v-model="start" type="datetime"/>
+          <ShanghaiDateTime v-model="start"/>
         </el-form-item>
         <el-form-item label="占用结束">
-          <el-date-picker v-model="end" type="datetime"/>
+          <ShanghaiDateTime v-model="end"/>
         </el-form-item>
         <el-form-item label="原因">
           <el-select v-model="reason">

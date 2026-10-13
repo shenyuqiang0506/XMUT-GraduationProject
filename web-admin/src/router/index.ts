@@ -31,5 +31,5 @@ router.beforeEach(to => {
     const s = useSession();
     if (!s.signedIn && to.path != '/login') return '/login';
     if (s.signedIn && to.path === '/login') return '/resources';
-    if (to.meta.admin && !s.admin || to.meta.manager && !s.manager) return '/resources'
+    if ((to.meta.admin && !s.admin) || (to.meta.manager && !s.manager)) return '/resources'
 })

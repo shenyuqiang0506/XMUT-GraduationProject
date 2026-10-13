@@ -5,6 +5,9 @@
  */
 import {ref, onMounted} from 'vue'
 import {api, explain} from '../api/client'
+import {usePagedOptions} from '../composables/usePagedOptions'
+import ShanghaiDateTime from '../components/ShanghaiDateTime.vue'
+import {shanghaiRange} from '../utils/time'
 import type {Resource, Page as ResourcePage} from '../types'
 
 interface Plan {
@@ -39,36 +42,30 @@ interface Calendar {
 }
 
 // 日常业务默认使用真实来源；测试资料必须显式选择隔离模式。
-const start = ref<Date>(), end = ref<Date>(), campus = ref(''), building = ref(''), participants = ref(20),
+const start = ref(''), end = ref(''), campus = ref(''), building = ref(''), participants = ref(20),
     mode = ref('REAL')
 const features = ref<string[]>([]), equipment = ref<{ type: string; count: number }[]>([])
-const result = ref<SearchResult>(), calendar = ref<Calendar>(), resourceId = ref(''), resources = ref<Resource[]>([])
-const resourcePage = ref(1), resourceTotal = ref(0), busy = ref(false), error = ref('')
+const result = ref<SearchResult>(), calendar = ref<Calendar>(), resourceId = ref('')
+const busy = ref(false), error = ref('')
 const labels: Record<string, string> = {COMPLETE: '已确认完整覆盖', PARTIAL: '仅部分覆盖', UNKNOWN: '覆盖待核实'}
 const featureOptions = [{code: 'PROJECTOR', label: '投影'}, {code: 'WHITEBOARD', label: '白板'}, {
   code: 'SOUND_SYSTEM',
   label: '音响'
 }, {code: 'NETWORK', label: '网络'}, {code: 'COMPUTER', label: '电脑'}, {code: 'MICROPHONE', label: '固定话筒'}, {code: 'DESK', label: '桌椅'}]
 
-// 把浏览器 Date 转为带 Z 偏移的 ISO 时间，避免服务端误把本地时刻当作 UTC。
-function range() {
-  if (!start.value || !end.value) throw new Error('请选择开始和结束时间')
-  // 发送明确的 UTC 偏移；服务器按上海自然日判断是否跨日。
-  return {startAt: start.value.toISOString(), endAt: end.value.toISOString()}
-}
+// 组合查询与日历共用上海时刻输入；组合查询另要求同一自然日。
+function range(singleDay = false) { return shanghaiRange(start.value, end.value, singleDay) }
+
+const {items: resources, loading: resourceLoading, hasMore: resourceHasMore, more: loadNextResourcePage} =
+    usePagedOptions<Resource>(page => api<ResourcePage<Resource>>('/resources?type=VENUE&size=100&page=' + page))
 
 async function loadResources() {
-  try {
-    const data = await api<ResourcePage<Resource>>('/resources?type=VENUE&size=100&page=' + resourcePage.value);
-    resources.value.push(...data.items);
-    resourceTotal.value = data.total
-  } catch (e) {
-    error.value = explain(e)
-  }
+  try { await loadNextResourcePage() }
+  catch (e) { error.value = explain(e) }
 }
 
 async function more() {
-  resourcePage.value++;
+  error.value = ''
   await loadResources()
 }
 
@@ -76,12 +73,13 @@ onMounted(loadResources)
 
 // 清除旧结果再查询，避免失败后仍把上一次方案当作本次结果。当前页面最多展示返回的前 100 套组合。
 async function search() {
+  if (busy.value) return
   busy.value = true;
   error.value = '';
   result.value = undefined
   try {
     result.value = await api<SearchResult>('/availability/search', 'POST', {
-      ...range(),
+      ...range(true),
       campus: campus.value || null,
       preferredBuilding: building.value || null,
       participantCount: participants.value,
@@ -100,6 +98,7 @@ async function search() {
 
 // 使用同一查询窗口读取指定资源的日历，切换资源时清除旧日历，避免混淆覆盖证据。
 async function showCalendar(id = resourceId.value) {
+  if (busy.value) return
   busy.value = true;
   error.value = '';
   calendar.value = undefined;
@@ -129,14 +128,14 @@ function display(value: string) {
   <el-alert title="查询不会预留资源。联合申请与审批仍在后续开发；演示资料不代表学校真实安排。" type="info"
             :closable="false"/>
   <div class="card">
-    <el-form label-position="top" @submit.prevent="search">
+    <el-form label-position="top" :disabled="busy" @submit.prevent="search">
+      <p class="small">输入和结果均按上海时间（UTC+08:00）处理，组合查询需在同一自然日内。</p>
       <div class="twocol">
         <el-form-item label="开始时间">
-          <el-date-picker v-model="start" data-testid="availability-start" type="datetime"
-                          format="YYYY-MM-DD HH:mm:ss"/>
+          <ShanghaiDateTime v-model="start" data-testid="availability-start"/>
         </el-form-item>
         <el-form-item label="结束时间">
-          <el-date-picker v-model="end" data-testid="availability-end" type="datetime" format="YYYY-MM-DD HH:mm:ss"/>
+          <ShanghaiDateTime v-model="end" data-testid="availability-end"/>
         </el-form-item>
         <el-form-item label="校区">
           <el-input v-model="campus" maxlength="100"/>
@@ -191,7 +190,7 @@ function display(value: string) {
       <el-table-column prop="policyVersion" label="规则版本" width="100"/>
       <el-table-column label="操作" width="130">
         <template #default="{row}">
-          <el-button text @click="showCalendar(row.venueId)">查看日历</el-button>
+          <el-button text :disabled="busy" @click="showCalendar(row.venueId)">查看日历</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -200,7 +199,7 @@ function display(value: string) {
     <el-select v-model="resourceId" filterable placeholder="选择可见场地">
       <el-option v-for="r in resources" :key="r.id" :label="r.name+' · '+r.dataMode" :value="r.id"/>
     </el-select>
-    <el-button v-if="resources.length<resourceTotal" @click="more">加载更多场地</el-button>
+    <el-button v-if="resourceHasMore" :loading="resourceLoading" @click="more">加载更多场地</el-button>
     <el-button :loading="busy" @click="showCalendar()">查看选定时段</el-button>
     <div v-if="calendar" data-testid="availability-calendar"><p>
       {{ labels[calendar.coverageStatus] || calendar.coverageStatus }} · 查询时间 {{ display(calendar.checkedAt) }}</p>

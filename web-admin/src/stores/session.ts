@@ -6,9 +6,10 @@
 import {defineStore} from 'pinia'
 import {ref, computed} from 'vue'
 import type {Actor, Tokens} from '../types'
+import {ApiError, fetchResponse, readResponse} from '../api/http'
 
 export const useSession = defineStore('session', () => {
-    const accessToken = ref(''), refreshToken = ref(''), actor = ref<Actor | null>(null)
+    const accessToken = ref(''), refreshToken = ref(''), actor = ref<Actor | null>(null), sessionVersion = ref(0)
     // 保存正在进行的刷新 Promise；其他并发请求直接等待同一结果。
     let flight: Promise<void> | null = null
     const deviceId = localStorage.getItem('xmut-device') || crypto.randomUUID()
@@ -19,6 +20,9 @@ export const useSession = defineStore('session', () => {
 
     // 清理页面身份及令牌；保留设备编号，使下一次登录仍能被服务端识别为同一设备。
     function clear() {
+        // 身份代数只在退出/重登录时变化，正常令牌轮换保持不变。
+        sessionVersion.value++;
+        flight = null;
         accessToken.value = '';
         refreshToken.value = '';
         actor.value = null
@@ -32,31 +36,37 @@ export const useSession = defineStore('session', () => {
 
     // 登录和刷新不依赖已有访问令牌，因此独立发送请求，避免使用业务 api 导致递归刷新。
     async function publicCall(path: string, payload: unknown): Promise<Tokens> {
-        const r = await fetch('/api/v1' + path, {
+        const r = await fetchResponse(path, {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-Trace-Id': crypto.randomUUID()},
-            body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(15000)
+            body: JSON.stringify(payload)
         })
-        const b = await r.json();
-        if (!r.ok) throw new Error(b.message || '登录服务暂时不可用');
-        return b.data
+        const tokens = await readResponse<Tokens>(r)
+        if (!tokens || typeof tokens.accessToken !== 'string' || !tokens.accessToken
+            || typeof tokens.refreshToken !== 'string' || !tokens.refreshToken)
+            throw new ApiError('登录服务响应格式不正确，请稍后重试', r.status, 'INVALID_RESPONSE')
+        return tokens
     }
 
-    // 先清除旧身份，再登录并查询 /users/me；获取身份失败时不能保留半登录状态。
+    // 令牌与身份必须来自同一次登录；退出或新的登录开始后，丢弃旧请求的迟到结果。
     async function login(username: string, password: string) {
-        clear();
-        accept(await publicCall('/auth/login', {username, password, deviceId, deviceType: 'WEB'}));
+        clear()
+        const version = sessionVersion.value
+        const current = () => {
+            if (version !== sessionVersion.value) throw new ApiError('登录身份已改变，请重新操作', 401, 'SESSION_CHANGED')
+        }
         try {
-            const r = await fetch('/api/v1/users/me', {
-                headers: {Authorization: 'Bearer ' + accessToken.value},
-                signal: AbortSignal.timeout(15000)
-            });
-            const b = await r.json();
-            if (!r.ok) throw new Error(b.message || '无法获取身份');
-            actor.value = b.data
+            const tokens = await publicCall('/auth/login', {username, password, deviceId, deviceType: 'WEB'})
+            current()
+            accept(tokens)
+            const r = await fetchResponse('/users/me', {
+                headers: {Authorization: 'Bearer ' + accessToken.value, 'X-Trace-Id': crypto.randomUUID()}
+            })
+            const identity = await readResponse<Actor>(r)
+            current()
+            actor.value = identity
         } catch (e) {
-            clear();
+            if (version === sessionVersion.value) clear()
             throw e
         }
     }
@@ -66,35 +76,42 @@ export const useSession = defineStore('session', () => {
         if (accessToken.value && sent !== accessToken.value) return
         if (flight) return flight
         if (!refreshToken.value) {
-            clear();
-            throw new Error('请重新登录')
+            clear()
+            throw new ApiError('登录状态已失效，请重新登录', 401, 'SESSION_EXPIRED')
         }
-        flight = (async () => {
+        const version = sessionVersion.value
+        const task: Promise<void> = (async () => {
             try {
-                accept(await publicCall('/auth/refresh', {refreshToken: refreshToken.value, deviceId}))
+                const tokens = await publicCall('/auth/refresh', {refreshToken: refreshToken.value, deviceId})
+                if (version !== sessionVersion.value)
+                    throw new ApiError('登录身份已改变，请重新操作', 401, 'SESSION_CHANGED')
+                accept(tokens)
             } catch (e) {
-                clear();
+                if (version === sessionVersion.value) clear()
                 throw e
             } finally {
-                flight = null
+                // 旧刷新结束时不能清掉另一身份正在进行的刷新任务。
+                if (version === sessionVersion.value) flight = null
             }
-        })();
-        return flight
+        })()
+        flight = task
+        return task
     }
 
-    // 尽力请求服务端撤销当前会话；即使网络出错也清除本地身份，避免界面继续表现为已登录。
+    // 先清理本地身份，再尽力撤销服务器会话，迟到刷新不能重新写回令牌。
     async function logout() {
+        const token = accessToken.value
+        clear()
         try {
-            if (accessToken.value) await fetch('/api/v1/auth/logout', {
+            if (token) await fetchResponse('/auth/logout', {
                 method: 'POST',
-                headers: {Authorization: 'Bearer ' + accessToken.value, 'Content-Type': 'application/json'},
-                body: '{}',
-                signal: AbortSignal.timeout(10000)
+                headers: {Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', 'X-Trace-Id': crypto.randomUUID()},
+                body: '{}'
             })
-        } finally {
-            clear()
+        } catch {
+            // 已离线也保持退出状态；不把网络异常变成未处理的页面错误。
         }
     }
 
-    return {accessToken, actor, signedIn, manager, admin, login, refresh, logout, clear}
+    return {accessToken, sessionVersion, actor, signedIn, manager, admin, login, refresh, logout, clear}
 })

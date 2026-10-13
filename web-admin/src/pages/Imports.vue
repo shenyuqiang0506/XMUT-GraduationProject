@@ -7,14 +7,18 @@
 import {ref, onMounted, watch} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
+import {usePagedOptions} from '../composables/usePagedOptions'
+import ShanghaiDateTime from '../components/ShanghaiDateTime.vue'
+import {shanghaiRange, shanghaiInstant} from '../utils/time'
+import {jsonObject, stringObject} from '../utils/forms'
 import type {ImportBatch, Group, Resource, Page} from '../types'
 
 // 日常业务默认使用真实来源；测试资料必须显式选择隔离模式。
 const file = ref<File | null>(null), source = ref('CAMPUS_CATALOG'), mode = ref('REAL'), group = ref(''),
     mapping = ref('{}'), context = ref('{}'), batch = ref<ImportBatch | null>(null), busy = ref(false), error = ref(''),
     groups = ref<Group[]>([]), keys = mutationKeys()
-const kind = ref('RESOURCE_CATALOG'), resources = ref<Resource[]>([]), resourceIds = ref<string[]>([])
-const resourcePage = ref(1), resourceTotal = ref(0), from = ref<Date>(), to = ref<Date>(), captured = ref<Date>()
+const kind = ref('RESOURCE_CATALOG'), resourceIds = ref<string[]>([])
+const from = ref(''), to = ref(''), captured = ref('')
 const completeness = ref('PARTIAL'), description = ref('')
 // 预览只对应当时的文件和参数；修改输入后必须重新核对，避免确认旧批次。
 watch([source, mode, group, mapping, context, kind, resourceIds, from, to, captured, completeness, description], () => { batch.value = null }, {deep: true})
@@ -27,20 +31,16 @@ onMounted(async () => {
   }
 })
 
-// 分页加载可管理或可见的资源供时间范围选择，具体来源与模式在模板中进一步过滤。
-async function loadResources() {
-  const data = await api<Page<Resource>>('/resources?size=100&page=' + resourcePage.value)
-  resources.value.push(...data.items);
-  resourceTotal.value = data.total
-}
+// 资源选项与文件提交使用独立加载状态，失败不会跳过当前页。
+const {items: resources, loading: resourceLoading, hasMore: resourceHasMore, more: loadNextResourcePage} =
+    usePagedOptions<Resource>(page => api<Page<Resource>>('/resources?size=100&page=' + page))
+
+async function loadResources() { await loadNextResourcePage() }
 
 async function more() {
-  try {
-    resourcePage.value++;
-    await loadResources()
-  } catch (e) {
-    error.value = explain(e)
-  }
+  error.value = ''
+  try { await loadResources() }
+  catch (e) { error.value = explain(e) }
 }
 
 // 导入类型或来源条件变化时，同时丢弃旧批次与已选资源范围。
@@ -59,21 +59,27 @@ function selected(e: Event) {
 // 将文件摘要与全部输入共同作为前端幂等内容；服务端仍独立计算摘要并保存受控文件。
 // 目录导入附审批组上下文，时间导入附覆盖窗口、采集时间和明确资源范围。
 async function preview() {
+  if (busy.value) return
   busy.value = true;
   error.value = '';
   batch.value = null;
   try {
     if (!file.value) throw new Error('请选择导入文件');
     if (file.value.size > 2 * 1024 * 1024) throw new Error('文件不能超过 2 MB');
-    const mappingData = JSON.parse(mapping.value),
-        contextData = kind.value === 'RESOURCE_CATALOG'
-            ? {...JSON.parse(context.value), ...(group.value ? {approvalGroupId: group.value} : {})}
-            : {
-              ...JSON.parse(context.value), ...(from.value ? {from: from.value.toISOString()} : {}),
-              ...(to.value ? {to: to.value.toISOString()} : {}), ...(captured.value ? {capturedAt: captured.value.toISOString()} : {}),
-              completeness: completeness.value, ...(description.value ? {sourceDescription: description.value} : {}),
-              ...(resourceIds.value.length ? {resourceIds: resourceIds.value} : {})
-            };
+    const mappingData = stringObject(mapping.value, '字段映射'), extra = jsonObject(context.value, '查询与采集说明')
+    let contextData: Record<string, unknown>
+    if (kind.value === 'RESOURCE_CATALOG') {
+      contextData = {...extra, ...(group.value ? {approvalGroupId: group.value} : {})}
+    } else {
+      const dates = from.value && to.value ? shanghaiRange(from.value, to.value) : undefined
+      contextData = {
+        ...extra, ...(from.value ? {from: dates?.startAt || shanghaiInstant(from.value, '覆盖开始')} : {}),
+        ...(to.value ? {to: dates?.endAt || shanghaiInstant(to.value, '覆盖结束')} : {}),
+        ...(captured.value ? {capturedAt: shanghaiInstant(captured.value, '来源采集时间')} : {}),
+        completeness: completeness.value, ...(description.value ? {sourceDescription: description.value} : {}),
+        ...(resourceIds.value.length ? {resourceIds: resourceIds.value} : {})
+      }
+    }
     // 完整覆盖必须显式选择资源范围，不能由文件缺失记录自动推断。
     const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await file.value.arrayBuffer()))).map(v => v.toString(16).padStart(2, '0')).join('');
     const payload = {
@@ -102,7 +108,7 @@ async function preview() {
 
 // 只确认已保存的 batchId；不重新上传文件。最终摘要、权限及行错误检查仍由服务端执行。
 async function commit() {
-  if (!batch.value || batch.value.summary.errorRows > 0) return;
+  if (busy.value || !batch.value || batch.value.summary.errorRows > 0) return;
   busy.value = true;
   error.value = '';
   const id = batch.value.batchId;
@@ -157,7 +163,7 @@ async function commit() {
             <el-option v-for="r in resources.filter(r=>r.sourceSystem===source&&r.dataMode===mode)" :key="r.id"
                        :label="r.name+' · '+r.sourceId" :value="r.id"/>
           </el-select>
-          <el-button v-if="resources.length<resourceTotal" @click="more">加载更多资源</el-button>
+          <el-button v-if="resourceHasMore" :loading="resourceLoading" @click="more">加载更多资源</el-button>
         </el-form-item>
         <el-form-item label="覆盖完整性">
           <el-select v-model="completeness">
@@ -165,14 +171,15 @@ async function commit() {
             <el-option label="已确认完整 COMPLETE" value="COMPLETE"/>
           </el-select>
         </el-form-item>
+        <p class="small">覆盖范围与采集时间均按上海时间（UTC+08:00）填写。</p>
         <el-form-item label="覆盖开始">
-          <el-date-picker v-model="from" type="datetime"/>
+          <ShanghaiDateTime v-model="from"/>
         </el-form-item>
         <el-form-item label="覆盖结束">
-          <el-date-picker v-model="to" type="datetime"/>
+          <ShanghaiDateTime v-model="to"/>
         </el-form-item>
         <el-form-item label="来源采集时间">
-          <el-date-picker v-model="captured" type="datetime"/>
+          <ShanghaiDateTime v-model="captured"/>
         </el-form-item>
         <el-form-item label="来源依据">
           <el-input v-model="description" maxlength="500" placeholder="填写来源和此次查询的筛选条件"/>

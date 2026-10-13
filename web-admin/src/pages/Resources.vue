@@ -6,6 +6,7 @@
 import {ref, onMounted} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
+import {stringObject} from '../utils/forms'
 import {useSession} from '../stores/session'
 import type {Resource, Group, Page, User} from '../types'
 
@@ -93,7 +94,7 @@ function open(row?: Resource) {
 async function save() {
   saving.value = true;
   try {
-    const features = JSON.parse(featureText.value);
+    const features = stringObject(featureText.value, '设施配置');
     const {id, version, availability, coverageStatus, ...all} = form.value as typeof form.value & Partial<Resource>;
     let payload: unknown = all, path = '/admin/resources', method = 'POST';
     if (editing.value) {

@@ -1,0 +1,89 @@
+{
+  "date": "2026-10-13",
+  "scope": "前端故障与跨时区验收；浏览器使用模拟 API，真实业务回归单独记录",
+  "unitChecks": 6,
+  "browserScenarios": 10,
+  "checks": [
+    {
+      "check": "海外浏览器提交上海时刻，跨上海自然日查询在发送前被拒绝",
+      "result": "PASS"
+    },
+    {
+      "check": "可用时段查询加载失败后重试原页，快速点击只发一个请求",
+      "result": "PASS"
+    },
+    {
+      "check": "资料导入加载失败后重试原页，快速点击只发一个请求",
+      "result": "PASS"
+    },
+    {
+      "check": "开放与占用管理加载失败后重试原页，快速点击只发一个请求",
+      "result": "PASS"
+    },
+    {
+      "check": "设施和导入 JSON 错误显示中文，并阻止发送写请求",
+      "result": "PASS"
+    },
+    {
+      "check": "HTML 网关错误在页面显示中文与追踪号",
+      "result": "PASS"
+    },
+    {
+      "check": "刷新服务故障保持 503 类型，旧请求不会把服务故障改成登录过期",
+      "result": "PASS"
+    },
+    {
+      "check": "退出后迟到的刷新响应不能恢复旧会话",
+      "result": "PASS"
+    },
+    {
+      "check": "并发 401 共用一次刷新，并复用原幂等键及更新后的令牌",
+      "result": "PASS"
+    },
+    {
+      "check": "资源提交断网后重试保持原幂等键，成功后关闭表单",
+      "result": "PASS"
+    },
+    {
+      "check": "JSON 输入错误使用中文，并拒绝数组、null 及非字符串映射",
+      "result": "PASS"
+    },
+    {
+      "check": "上海时刻校验日期、区间顺序和自然日，不依赖本地时区",
+      "result": "PASS"
+    },
+    {
+      "check": "分页合并保护并发、失败不跳页、跨页重复按 ID 更新",
+      "result": "PASS"
+    },
+    {
+      "check": "HTML、空响应和错误信封保留 HTTP 状态，返回统一请求错误",
+      "result": "PASS"
+    },
+    {
+      "check": "超时和断网使用中文且保持不同错误码",
+      "result": "PASS"
+    },
+    {
+      "check": "写入结果未知时保留幂等键，明确成功后下一次操作生成新键",
+      "result": "PASS"
+    }
+  ],
+  "webTypeCheckAndBuild": "PASS",
+  "failed": 0,
+  "realDevRegression": {
+    "catalogBackendChecks": 13,
+    "catalogBrowserScenarios": 3,
+    "availabilityBackendChecks": 14,
+    "availabilityBrowserScenarios": 3,
+    "personnelBackendChecks": 8,
+    "personnelBrowserScenarios": 2
+  },
+  "temporaryPortsReleased": {
+    "8081": true,
+    "8082": true,
+    "8083": true,
+    "5173": true
+  },
+  "productionDeployment": false
+}

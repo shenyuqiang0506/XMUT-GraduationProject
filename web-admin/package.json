@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && tsc --noEmit -p tests/tsconfig.json && vite build",
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:frontend": "playwright test tests/frontend-unit.spec.ts tests/frontend-browser.spec.ts"
   },
   "dependencies": {
     "element-plus": "2.14.7",

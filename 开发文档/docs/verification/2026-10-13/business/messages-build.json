@@ -1,0 +1,69 @@
+{
+  "date": "2026-10-13",
+  "stage": "M4",
+  "javaModules": 8,
+  "javaVerify": {
+    "tests": 60,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "result": "PASS"
+  },
+  "sharedModuleInstall": "PASS",
+  "webTypecheckAndBuild": "PASS",
+  "frontendRegression": {
+    "passed": 16,
+    "failed": 0
+  },
+  "waitlistsAndMessages": {
+    "passedGroups": 20,
+    "failed": 0,
+    "browserScenarios": 3,
+    "infrastructure": "dev MySQL/Redis/RabbitMQ/Nacos"
+  },
+  "regressions": {
+    "auth": "PASS",
+    "catalogApi": "PASS",
+    "availabilityApiAndBrowser": "PASS",
+    "applicationsApiAndBrowser": "PASS"
+  },
+  "ideaStartup": {
+    "result": "PASS",
+    "services": [
+      "identity",
+      "booking",
+      "notification",
+      "gateway"
+    ],
+    "ports": [
+      8083,
+      8082,
+      8085,
+      8081
+    ],
+    "temporaryProcessesStopped": true
+  },
+  "environmentIsolation": {
+    "result": "PASS",
+    "privateFilesGitIgnored": true,
+    "devProdServiceSignatureKeysIndependent": true,
+    "prodStarted": false
+  },
+  "limitations": [
+    "仅 IN_APP 站内通知，未实现 Email/Push",
+    "移动端暂缓",
+    "未部署 prod",
+    "未做吞吐压测或灾备恢复演练",
+    "固定全局写协调行仍串行化预约与目录写入",
+    "跨身份库资格检查与预约提交不是分布式原子事务"
+  ],
+  "faultEvidence": [
+    "两发布/候补实例并发扫描",
+    "真实 dev RabbitMQ 暂停及恢复",
+    "通知数据库触发器故障回滚与死信重放",
+    "模拟过期 SENDING 租约恢复",
+    "重复与不同内容事件去重检查",
+    "独立实例 Redis 缓存端口不可用时回源"
+  ],
+  "verificationBoundary": "重复消息验证提交后重投的去重结果；租约恢复使用认领后进程中断的数据库现场，不宣称完成网络层逐帧 ACK 丢失或多节点故障验证"
+}

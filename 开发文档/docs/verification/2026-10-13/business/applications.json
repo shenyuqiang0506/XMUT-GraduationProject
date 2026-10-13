@@ -75,7 +75,7 @@
       "result": "PASS"
     },
     {
-      "check": "每个成功申请版本原子写入唯一 Outbox，投递消费者留待 M4，不假装已经通知",
+      "check": "每个成功申请版本原子写入唯一 Outbox，本回归关闭投递以独立核对 PENDING 记录",
       "result": "PASS"
     },
     {

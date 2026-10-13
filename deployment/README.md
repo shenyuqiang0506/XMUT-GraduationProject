@@ -45,7 +45,7 @@ python3 deployment/scripts/bootstrap-nacos.py dev
 deployment/scripts/compose.sh dev ps
 ```
 
-Nacos 初始化脚本使用已保存的管理员密码，首次初始化后发布各服务 Data ID（booking-service、identity-service、ai-service、gateway 的 `.properties`，并保留旧 GraduationProject）的 `platform.environment=dev`。重复运行会验证登录和已有标记，不覆盖已有业务配置。Nacos 默认管理员名为 `nacos`；密码见私密账号记录。
+Nacos 初始化脚本使用已保存的管理员密码，首次初始化后发布各服务 Data ID（booking-service、identity-service、notification-service、ai-service、gateway 的 `.properties`，并保留旧 GraduationProject）的 `platform.environment=dev`。重复运行会验证登录和已有标记，不覆盖已有业务配置。Nacos 默认管理员名为 `nacos`；密码见私密账号记录。
 
 MySQL 初始化只在**空数据卷**运行。健康检查会验证 booking 账号能查询自己的库，而不只是数据库进程存活。调整 `.env` 不会自动修改已有 MySQL、RabbitMQ 或 Nacos 账号；轮换密码需要先修改对应服务，再同步环境文件、账号记录与 Java 配置文件。
 
@@ -113,23 +113,26 @@ python3 deployment/scripts/bootstrap-nacos.py prod
 ```sh
 python3 deployment/scripts/init-auth.py dev
 python3 deployment/scripts/init-auth.py prod
+python3 deployment/scripts/prepare-messaging.py dev
+python3 deployment/scripts/prepare-messaging.py prod
 ```
 
 每套环境生成 RSA 3072 私钥/公钥、`auth.env`、`identity.env`，权限 600。`auth.env` 保存公钥路径、issuer、audience、key ID 与私密导入目录；身份私钥只在 identity 环境中加载。dev 的 `business-accounts.md` 留存初始化账号与原始密码，数据库只保存 BCrypt。prod 没有 dev 初始化账号，首次管理员需在上线前通过受控配置流程建立；本次未启动 prod。
 
-`run-service.py` 分别加载身份库与目录库凭据，启用 `dev,business`。身份首次启动可使用 `--bootstrap-admin`，只允许 dev，已有账号不重置。手工在三个终端启动：
+`run-service.py` 分别加载身份库与目录库凭据，启用 `dev,business`。身份首次启动可使用 `--bootstrap-admin`，只允许 dev，已有账号不重置。手工在四个终端启动：
 
 ```sh
 python3 deployment/scripts/run-service.py dev identity-service --bootstrap-admin
 python3 deployment/scripts/run-service.py dev booking-service
+python3 deployment/scripts/run-service.py dev notification-service
 python3 deployment/scripts/run-service.py dev gateway
 ```
 
-推荐根目录运行 `python3 deployment/scripts/dev-workspace.py start` 启动三个服务与 Web。它记录 PID、启动时间与所属进程组；`stop` 只停止本脚本创建且身份匹配的进程及同组子进程。端口占用时不接管其他进程，日志与记录保存在 `secrets/dev/`。
+推荐根目录运行 `python3 deployment/scripts/dev-workspace.py start` 启动四个服务与 Web。它记录 PID、启动时间与所属进程组；`stop` 只停止本脚本创建且身份匹配的进程及同组子进程。端口占用时不接管其他进程，日志与记录保存在 `secrets/dev/`。
 
-IDEA 调试可先在仓库根目录执行 `python3 deployment/scripts/prepare-idea.py`，然后选 **后端总启动（dev）**。它同时启动 identity、booking、gateway，分服务配置也可独立运行。准备脚本从现有 dev 私密文件生成 `secrets/dev/idea/*.properties`，权限 600；身份签名私钥和初始化管理员凭据只进入身份服务配置。Spring 通过 VM 参数 `spring.config.additional-location` 加载文件；新电脑需先完成上面的基础环境和 `init-auth.py dev`，轮换凭据后需重新生成。共享 `.run` XML 不含密码；当前内层 IDEA 工程的适配 XML 保存在被忽略的 `.idea/runConfigurations/`。此配置仅用于 dev。
+IDEA 调试可先在仓库根目录执行 `python3 deployment/scripts/prepare-idea.py`，然后选 **后端总启动（dev）**。它同时启动 identity、booking、notification、gateway，分服务配置也可独立运行。准备脚本从现有 dev 私密文件生成 `secrets/dev/idea/*.properties`，权限 600；身份签名私钥和初始化管理员凭据只进入身份服务配置。Spring 通过 VM 参数 `spring.config.additional-location` 加载文件；新电脑需先完成上面的基础环境和 `init-auth.py dev`，轮换凭据后需重新生成。共享 `.run` XML 不含密码；当前内层 IDEA 工程的适配 XML 保存在被忽略的 `.idea/runConfigurations/`。此配置仅用于 dev。
 
-可在根目录 Maven `verify` 后运行 `python3 deployment/scripts/verify-idea.py` 验证：清除继承的服务环境变量，以同样的私密 properties 启动三个 JAR，检查 readiness 与网关未认证拒绝。8081–8083 已占用时退出，不接管现有进程；结束后关闭本次启动的进程。日志保存在私密 `secrets/dev/idea-verification/`。不要同时使用 IDEA 和命令行启动器占用同一组端口。
+可在根目录 Maven `verify` 后运行 `python3 deployment/scripts/verify-idea.py` 验证：清除继承的服务环境变量，以同样的私密 properties 启动四个 JAR，检查 readiness 与网关未认证拒绝。8081–8083、8085 已占用时退出，不接管现有进程；结束后关闭本次启动的进程。日志保存在私密 `secrets/dev/idea-verification/`。不要同时使用 IDEA 和命令行启动器占用同一组端口。
 
 Flyway 已执行的版本迁移保持原始内容，后续结构变更新增迁移。不要对历史 `V*.sql` 自动格式化，也不要关闭迁移校验来绕过 checksum mismatch。
 
@@ -162,3 +165,15 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/applications-smoke.py
 脚本使用真实 MySQL / Redis / Nacos，临时创建自己的来源、资源、账号和明确标记的测试策略，检查覆盖、开放、占用、组合与事务回滚；结束后清理本轮资料，恢复原生效策略并停止自己启动的进程。新执行的公开结果位于 `开发文档/docs/verification/<日期>/business/`，原阶段证据保留在 `2026-10-11/m3/`，私密日志不进 Git。
 
 M3 的 Flyway V2 已在本机 dev 执行，不得重新排版；以后结构变更新增迁移。新环境策略为空，需系统管理员依据已确认制度显式配置 REAL，页面默认 REAL，规则缺失时留空并由管理员依据制度填写。V3 已在本机 dev 建立联合申请、整组暂占、审批、到期补偿与 Outbox。V3 同样必须保持已执行原文，后续结构变更新增版本。查询不预留资源，提交后才暂占，授权批准后方可使用；Outbox 投递与通知属于 M4。预约写事务 READ COMMITTED，读取快照 REPEATABLE READ。详细接口、固定协调行的串行化边界、私密备份及恢复说明见 [M3 联合预约闭环](../开发文档/docs/development/19-M3联合预约闭环.md)。
+
+## M4 升级与通知服务
+
+已有 M3 私密凭据后执行 `prepare-messaging.py dev` 与 `prepare-messaging.py prod`，为两个环境生成独立服务签名密钥及 notification.env，已有账号密码不变。通知仅使用自己的分库凭据。执行 `bootstrap-nacos.py dev` 添加通知服务环境标记，再执行 `prepare-idea.py`；不启动 prod。后端总启动新增 notification 8085，命令行启动器同样适配。
+
+预约 V4、通知 V1 已执行，历史迁移不可编辑；此前已备份两库至私密 backups 目录。默认不自动接管 legacy 事件，维护者备份审查后才显式接管。SENT 表示发布确认，用户已读另有状态。
+
+```sh
+XMUT_WEB_TEST=1 python3 deployment/scripts/waitlists-messaging-smoke.py
+```
+
+验收会短暂暂停并恢复 dev RabbitMQ，须先停止其他业务进程；清理独立 DEMO 数据和队列，不删除数据卷。失败事件和死信需系统管理员检查原因后带说明重试。首版仅 IN_APP 站内通知，单节点 RabbitMQ 不具备多节点容错。完整参数、接口与边界见 [M4 文档](../开发文档/docs/development/20-M4候补与消息.md)。

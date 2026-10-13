@@ -316,7 +316,7 @@ def main():
             assert s.sql("SELECT COUNT(*) FROM (SELECT aggregate_id,aggregate_version,COUNT(*) n FROM outbox_event WHERE aggregate_type='APPLICATION' AND aggregate_id IN (SELECT id FROM activity_application WHERE activity_name LIKE '"+prefix+"%') GROUP BY aggregate_id,aggregate_version HAVING n<>1) bad")=='0'
             assert s.sql("SELECT COUNT(*) FROM outbox_event o JOIN activity_application a ON a.id=o.aggregate_id WHERE a.activity_name LIKE '"+prefix+"%' AND o.status<>'PENDING'")=='0'
             assert s.sql("SELECT COUNT(*) FROM activity_application a WHERE a.activity_name LIKE '"+prefix+"%' AND (SELECT COUNT(*) FROM outbox_event o WHERE o.aggregate_type='APPLICATION' AND o.aggregate_id=a.id)<>a.version+1")=='0'
-            record('每个成功申请版本原子写入唯一 Outbox，投递消费者留待 M4，不假装已经通知')
+            record('每个成功申请版本原子写入唯一 Outbox，本回归关闭投递以独立核对 PENDING 记录')
             if os.environ.get('XMUT_WEB_TEST')=='1':
                 env=os.environ.copy();env.update(TEST_APPLICATION_PREFIX=prefix,TEST_APPLICATION_CAMPUS=prefix,
                     TEST_APPLICATION_VENUE=prefix+' 演示 venue',TEST_APPLICATION_START=(day+timedelta(hours=17)).strftime('%Y-%m-%d %H:%M:%S'),

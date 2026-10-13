@@ -88,3 +88,19 @@ export interface ImportBatch {
     fieldMapping: Record<string, string>;
     requiresConfirmation: boolean
 }
+
+/** 申请状态来自服务端；allowedActions 仅辅助显示，动作仍由服务器核对当前权限和版本。 */
+export type ApplicationStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'CONFLICT_REVIEW' | 'COMPLETED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED'
+export interface ApplicationSummary {
+    applicationId: string; activityName: string; status: ApplicationStatus; version: number;
+    participantCount: number; startAt: string; endAt: string; holdExpiresAt: string | null;
+    dataMode: string; approvalGroupId: string; policyVersion: number; lastReason: string | null;
+    updatedAt: string; allowedActions: string[]
+}
+export interface ApplicationDetail extends ApplicationSummary {
+    description: string | null;
+    applicant: {userId: string; username: string; displayName: string};
+    resourceIds: string[];
+    resources: {id: string; name: string; resourceType: string; campus: string | null; equipmentType: string | null}[];
+    approvalRecords: {operatorId: string | null; decision: string; reason: string | null; fromVersion: number; createdAt: string}[]
+}

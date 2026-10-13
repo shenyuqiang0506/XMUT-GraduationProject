@@ -17,6 +17,7 @@ export const useSession = defineStore('session', () => {
     const signedIn = computed(() => !!accessToken.value && !!actor.value)
     const manager = computed(() => actor.value?.roles.some(r => r === 'RESOURCE_ADMIN' || r === 'SYSTEM_ADMIN') ?? false)
     const admin = computed(() => actor.value?.roles.includes('SYSTEM_ADMIN') ?? false)
+    const applicant = computed(() => actor.value?.roles.some(r => r === 'STUDENT' || r === 'TEACHER') ?? false)
 
     // 清理页面身份及令牌；保留设备编号，使下一次登录仍能被服务端识别为同一设备。
     function clear() {
@@ -113,5 +114,5 @@ export const useSession = defineStore('session', () => {
         }
     }
 
-    return {accessToken, sessionVersion, actor, signedIn, manager, admin, login, refresh, logout, clear}
+    return {accessToken, sessionVersion, actor, signedIn, manager, admin, applicant, login, refresh, logout, clear}
 })

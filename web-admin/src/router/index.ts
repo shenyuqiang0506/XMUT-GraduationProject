@@ -10,13 +10,16 @@ import Imports from '../pages/Imports.vue'
 import Users from '../pages/Users.vue'
 import Availability from '../pages/Availability.vue'
 import Rules from '../pages/Rules.vue'
+import Applications from '../pages/Applications.vue'
+import Approvals from '../pages/Approvals.vue'
 
 export const router = createRouter({
     history: createWebHistory(),
     routes: [{path: '/login', component: Login}, {path: '/', redirect: '/resources'}, {
         path: '/resources',
         component: Resources
-    }, {path: '/availability', component: Availability}, {
+    }, {path: '/availability', component: Availability}, {path:'/applications',component:Applications},
+        {path:'/approvals',component:Approvals,meta:{manager:true}}, {
         path: '/rules',
         component: Rules,
         meta: {manager: true}

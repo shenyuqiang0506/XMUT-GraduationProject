@@ -27,11 +27,13 @@ async function logout() {
       <el-menu router :default-active="$route.path">
         <el-menu-item index="/resources">资源目录</el-menu-item>
         <el-menu-item index="/availability">可用时段查询</el-menu-item>
+        <el-menu-item index="/applications">我的申请</el-menu-item>
+        <el-menu-item v-if="session.manager" index="/approvals">预约审批</el-menu-item>
         <el-menu-item v-if="session.manager" index="/rules">开放与占用管理</el-menu-item>
         <el-menu-item v-if="session.manager" index="/imports">资料导入</el-menu-item>
         <el-menu-item v-if="session.admin" index="/users">账号与权限</el-menu-item>
       </el-menu>
-      <div class="stage">当前阶段 M3<br>可用性基础 · 预约审批待开发</div>
+      <div class="stage">联合预约<br>提交申请 · 审批与冲突复核</div>
     </aside>
     <section class="workspace">
       <header><span>校园资源预约</span>

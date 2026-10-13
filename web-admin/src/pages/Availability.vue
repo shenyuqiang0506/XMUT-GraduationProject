@@ -4,11 +4,14 @@
  * 结果是服务端检查时刻的快照，页面展示不会锁定资源或创建预约申请。
  */
 import {ref, onMounted} from 'vue'
-import {api, explain} from '../api/client'
+import {api, explain, mutationKeys} from '../api/client'
+import {useSession} from '../stores/session'
+import {useRouter} from 'vue-router'
+import {ElMessage} from 'element-plus'
 import {usePagedOptions} from '../composables/usePagedOptions'
 import ShanghaiDateTime from '../components/ShanghaiDateTime.vue'
 import {shanghaiRange} from '../utils/time'
-import type {Resource, Page as ResourcePage} from '../types'
+import type {Resource, Page as ResourcePage, ApplicationDetail} from '../types'
 
 interface Plan {
   venueId: string;
@@ -47,6 +50,10 @@ const start = ref(''), end = ref(''), campus = ref(''), building = ref(''), part
 const features = ref<string[]>([]), equipment = ref<{ type: string; count: number }[]>([])
 const result = ref<SearchResult>(), calendar = ref<Calendar>(), resourceId = ref('')
 const busy = ref(false), error = ref('')
+const session=useSession(), router=useRouter(), keys=mutationKeys()
+// 保存查询成功时的条件，申请使用这份快照，不读取后来被编辑的筛选字段。
+const searched=ref<{startAt:string;endAt:string;participantCount:number;requiredFeatures:string[]}>()
+const bookingDialog=ref(false), bookingPlan=ref<Plan>(), activityName=ref(''), description=ref('')
 const labels: Record<string, string> = {COMPLETE: '已确认完整覆盖', PARTIAL: '仅部分覆盖', UNKNOWN: '覆盖待核实'}
 const featureOptions = [{code: 'PROJECTOR', label: '投影'}, {code: 'WHITEBOARD', label: '白板'}, {
   code: 'SOUND_SYSTEM',
@@ -77,9 +84,11 @@ async function search() {
   busy.value = true;
   error.value = '';
   result.value = undefined
+  searched.value=undefined
   try {
+    const intent={...range(true),participantCount:participants.value,requiredFeatures:[...features.value]}
     result.value = await api<SearchResult>('/availability/search', 'POST', {
-      ...range(true),
+      ...intent,
       campus: campus.value || null,
       preferredBuilding: building.value || null,
       participantCount: participants.value,
@@ -89,11 +98,32 @@ async function search() {
       page: 1,
       size: 100
     })
+    searched.value=intent
   } catch (e) {
     error.value = explain(e)
   } finally {
     busy.value = false
   }
+}
+
+function prepareBooking(plan: Plan) {
+  if (busy.value || !session.applicant || !searched.value) return
+  bookingPlan.value=plan; activityName.value=''; description.value=''; error.value=''; bookingDialog.value=true
+}
+
+async function submitBooking() {
+  const plan=bookingPlan.value, intent=searched.value
+  if (busy.value || !plan || !intent) return
+  if (!activityName.value.trim()) { error.value='请填写活动名称'; return }
+  const payload={...intent,activityName:activityName.value.trim(),description:description.value.trim() || null,
+    venueId:plan.venueId,equipmentIds:[...plan.equipmentIds]}
+  busy.value=true; error.value=''
+  try {
+    await api<ApplicationDetail>('/applications','POST',payload,keys.key('APPLICATION_CREATE',payload))
+    keys.done('APPLICATION_CREATE',payload); bookingDialog.value=false
+    ElMessage.success('申请已提交，等待审批；可在我的申请查看当前状态')
+    await router.push('/applications')
+  } catch(e) { error.value=explain(e) } finally { busy.value=false }
 }
 
 // 使用同一查询窗口读取指定资源的日历，切换资源时清除旧日历，避免混淆覆盖证据。
@@ -125,7 +155,7 @@ function display(value: string) {
 <template>
   <h1>可用时段查询</h1>
   <p class="lead">查找一处场地和同审批组设备。只有来源覆盖有效、开放且无已知冲突的组合才会展示。</p>
-  <el-alert title="查询不会预留资源。联合申请与审批仍在后续开发；演示资料不代表学校真实安排。" type="info"
+  <el-alert title="查询结果不会预留资源。提交申请后才暂占整组资源，审批通过后方可使用。" type="info"
             :closable="false"/>
   <div class="card">
     <el-form label-position="top" :disabled="busy" @submit.prevent="search">
@@ -176,7 +206,7 @@ function display(value: string) {
       <el-button native-type="submit" type="primary" :loading="busy">查询可用组合</el-button>
     </el-form>
   </div>
-  <p v-if="error" class="error" role="alert">{{ error }}</p>
+  <p v-if="error && !bookingDialog" class="error" role="alert">{{ error }}</p>
   <div v-if="result" class="card" data-testid="availability-results">
     <h2>查询结果 · {{ result.total }} 处场地</h2>
     <p v-if="result.unavailableReason==='POLICY_NOT_CONFIGURED'">尚未配置已确认的预约策略，请联系管理员。</p>
@@ -188,9 +218,10 @@ function display(value: string) {
         <template #default="{row}">{{ row.equipmentIds.join('、') || '无需设备' }}</template>
       </el-table-column>
       <el-table-column prop="policyVersion" label="规则版本" width="100"/>
-      <el-table-column label="操作" width="130">
+      <el-table-column label="操作" width="220">
         <template #default="{row}">
           <el-button text :disabled="busy" @click="showCalendar(row.venueId)">查看日历</el-button>
+          <el-button v-if="session.applicant" text type="primary" :disabled="busy" @click="prepareBooking(row)">申请此组合</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -230,8 +261,8 @@ function display(value: string) {
           <template #default="{row}">{{ row.enabled ? '启用' : '停用' }}</template>
         </el-table-column>
       </el-table>
-      <h3>外部占用</h3>
-      <p v-if="!calendar.intervals.length">未发现外部占用；仍需结合覆盖状态和开放规则判断。</p>
+      <h3>占用时段</h3>
+      <p v-if="!calendar.intervals.length">未发现有效占用；仍需结合覆盖状态和开放规则判断。</p>
       <el-table :data="calendar.intervals">
         <el-table-column label="开始">
           <template #default="{row}">{{ display(row.startAt) }}</template>
@@ -240,9 +271,22 @@ function display(value: string) {
           <template #default="{row}">{{ display(row.endAt) }}</template>
         </el-table-column>
         <el-table-column label="类别">
-          <template #default>外部占用</template>
+          <template #default="{row}">{{ ({EXTERNAL:'外部占用',HOLD:'待审批暂占',CONFIRMED:'已批准预约',CONFLICT_REVIEW:'冲突待复核占用'} as Record<string,string>)[row.type] || '占用' }}</template>
         </el-table-column>
       </el-table>
     </div>
   </div>
+  <el-dialog v-model="bookingDialog" title="提交联合预约" width="600px" :close-on-click-modal="!busy" :close-on-press-escape="!busy" :show-close="!busy">
+    <div v-if="bookingPlan && searched" data-testid="booking-form">
+      <p>{{ bookingPlan.venueName }} · {{ searched.participantCount }} 人</p>
+      <p>{{ display(searched.startAt) }} 至 {{ display(searched.endAt) }}（上海时间）</p>
+      <p>设备编号：{{ bookingPlan.equipmentIds.join('、') || '无需设备' }}</p>
+      <el-form label-position="top" :disabled="busy" @submit.prevent="submitBooking">
+        <el-form-item label="活动名称"><el-input v-model="activityName" maxlength="200" data-testid="booking-name"/></el-form-item>
+        <el-form-item label="活动说明"><el-input v-model="description" type="textarea" maxlength="2000" :rows="4" data-testid="booking-description"/></el-form-item>
+        <p v-if="error" class="error" role="alert">{{ error }}</p>
+        <el-button native-type="submit" type="primary" :loading="busy">确认提交申请</el-button>
+      </el-form>
+    </div>
+  </el-dialog>
 </template>

@@ -13,7 +13,8 @@ SERVICES=[('identity-service','identity-service','org.shen.identity.IdentityAppl
           ('booking-service','GraduationProject','org.shen.graduationproject.GraduationProjectApplication','预约服务（dev）',8082),
           ('gateway','gateway','org.shen.gateway.GatewayApplication','网关（dev）',8081)]
 COMMON=['JWT_PUBLIC_KEY_PATH','JWT_ISSUER','JWT_AUDIENCE','JWT_KEY_ID','IMPORT_STORAGE_DIR','NACOS_SERVER_ADDR','NACOS_USERNAME','NACOS_PASSWORD']
-IDENTITY=['JWT_PRIVATE_KEY_PATH','IDENTITY_DB_URL','IDENTITY_DB_USERNAME','IDENTITY_DB_PASSWORD','REDIS_HOST','REDIS_PORT','REDIS_PASSWORD','AUTH_ADMIN_USERNAME','AUTH_ADMIN_PASSWORD']
+IDENTITY=['JWT_PRIVATE_KEY_PATH','AUTH_PASSWORD_FINGERPRINT_KEY_PATH','IDENTITY_DB_URL','IDENTITY_DB_USERNAME','IDENTITY_DB_PASSWORD','REDIS_HOST','REDIS_PORT','REDIS_PASSWORD','AUTH_ADMIN_USERNAME','AUTH_ADMIN_PASSWORD']
+GATEWAY=['REDIS_HOST','REDIS_PORT','REDIS_PASSWORD']
 BOOKING=['DB_URL','DB_USERNAME','DB_PASSWORD','REDIS_HOST','REDIS_PORT','REDIS_PASSWORD','RABBITMQ_HOST','RABBITMQ_PORT','RABBITMQ_USERNAME','RABBITMQ_PASSWORD','RABBITMQ_VHOST']
 
 # 按 Java properties 语法转义值，保留空格、分隔符及中文路径。
@@ -61,7 +62,7 @@ def main():
     PRIVATE.mkdir(mode=0o700,parents=True,exist_ok=True);os.chmod(PRIVATE,0o700)
     for service,module,main_class,name,port in SERVICES:
         env=runtime.service_env('dev',service,service=='identity-service')
-        keys=COMMON+(IDENTITY if service=='identity-service' else BOOKING if service=='booking-service' else [])
+        keys=COMMON+(IDENTITY if service=='identity-service' else BOOKING if service=='booking-service' else GATEWAY)
         values={k:env[k] for k in keys if k in env}
         for required in ['JWT_PUBLIC_KEY_PATH','JWT_ISSUER','JWT_AUDIENCE','NACOS_USERNAME','NACOS_PASSWORD']:
             if not values.get(required):raise RuntimeError('Missing private dev configuration: '+required)

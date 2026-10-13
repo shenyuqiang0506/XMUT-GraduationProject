@@ -28,16 +28,18 @@ public class AccessTokens {
     private final long seconds;
 
     public AccessTokens(@Value("${JWT_PRIVATE_KEY_PATH}") String privatePath, @Value("${JWT_PUBLIC_KEY_PATH}") String publicPath,
+                        @Value("${AUTH_PASSWORD_FINGERPRINT_KEY_PATH}") String fingerprintPath,
                         @Value("${JWT_ISSUER}") String issuer, @Value("${JWT_AUDIENCE}") String audience,
                         @Value("${JWT_KEY_ID}") String keyId, @Value("${AUTH_ACCESS_TTL_SECONDS:900}") long seconds) {
         if (seconds < 1 || seconds > 900) throw new IllegalStateException("Access TTL must be 1..900 seconds");
         var privateKey = JwtKeys.privateKey(privatePath);
         var key = new RSAKey.Builder(JwtKeys.publicKey(publicPath)).privateKey(privateKey).keyID(keyId).build();
         try {
-            var digest = java.security.MessageDigest.getInstance("SHA-256");
-            digest.update("xmut-identity-idempotency-password-v1".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            this.passwordFingerprintKey = new javax.crypto.spec.SecretKeySpec(digest.digest(privateKey.getEncoded()), "HmacSHA256");
-        } catch (java.security.GeneralSecurityException unavailable) {
+            byte[] fingerprintKey = java.nio.file.Files.readAllBytes(java.nio.file.Path.of(fingerprintPath));
+            if (fingerprintKey.length != 32) throw new IllegalStateException("Password fingerprint key must be 32 bytes");
+            this.passwordFingerprintKey = new javax.crypto.spec.SecretKeySpec(fingerprintKey, "HmacSHA256");
+            java.util.Arrays.fill(fingerprintKey, (byte) 0);
+        } catch (java.io.IOException unavailable) {
             throw new IllegalStateException("Password fingerprint unavailable");
         }
         this.encoder = new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(key)));
@@ -49,7 +51,8 @@ public class AccessTokens {
 
     /**
      * 为创建账号的幂等比较生成 HMAC 指纹。
-     * 指纹密钥由私钥材料派生，避免直接保存初始密码的普通快速摘要；轮换私钥会改变该指纹。
+     * 独立密钥文件只交给身份服务；轮换 JWT 私钥不会改变已保存请求的密码指纹。
+     * 指纹密钥本身轮换仍需等待旧幂等记录到期，不能随意覆盖。
      */
     public String passwordFingerprint(String password) {
         try {

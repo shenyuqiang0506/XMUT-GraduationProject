@@ -26,7 +26,7 @@ def main():
         raise SystemExit('Environment mismatch')
     private = ROOT / 'secrets' / environment
     private.mkdir(parents=True, mode=0o700, exist_ok=True)
-    targets = [private / 'jwt-private.pem', private / 'jwt-public.pem', private / 'auth.env', private / 'identity.env']
+    targets = [private / 'jwt-private.pem', private / 'jwt-public.pem', private / 'auth.env', private / 'identity.env', private / 'password-fingerprint.key']
     if any(path.exists() for path in targets):
         raise SystemExit('Authentication files already exist; refusing to rotate or overwrite them.')
     os.chmod(private, 0o700)
@@ -36,13 +36,17 @@ def main():
         os.close(fd)
     subprocess.run(['openssl', 'genpkey', '-algorithm', 'RSA', '-pkeyopt', 'rsa_keygen_bits:3072', '-out', str(targets[0])], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(['openssl', 'pkey', '-in', str(targets[0]), '-pubout', '-out', str(targets[1])], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # 新环境使用独立随机密钥，JWT 私钥后续轮换不会改变密码幂等指纹。
+    fd = os.open(targets[4], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, 'wb') as stream:
+        stream.write(secrets.token_bytes(32))
     # 其他服务只需公钥即可验证 JWT；私钥路径仅写入下方身份服务配置。
     common = {'JWT_PUBLIC_KEY_PATH': targets[1], 'JWT_ISSUER': 'urn:xmut:' + environment + ':identity',
               'JWT_AUDIENCE': 'xmut-' + environment + '-api', 'JWT_KEY_ID': 'xmut-' + environment + '-v1',
               'IMPORT_STORAGE_DIR': private / 'imports'}
     envfile(targets[2], common)
     port = '3306' if environment == 'dev' else '13306'
-    identity = {'JWT_PRIVATE_KEY_PATH': targets[0],
+    identity = {'JWT_PRIVATE_KEY_PATH': targets[0], 'AUTH_PASSWORD_FINGERPRINT_KEY_PATH': targets[4],
                 'IDENTITY_DB_URL': 'jdbc:mysql://127.0.0.1:' + port + '/identity_db?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true',
                 'IDENTITY_DB_USERNAME': source['IDENTITY_DB_USER'], 'IDENTITY_DB_PASSWORD': source['IDENTITY_DB_PASSWORD'],
                 'REDIS_HOST': '127.0.0.1', 'REDIS_PORT': '6379' if environment == 'dev' else '16379', 'REDIS_PASSWORD': source['REDIS_PASSWORD']}

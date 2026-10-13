@@ -26,7 +26,7 @@ def service_env(environment, service, bootstrap=False):
         raise RuntimeError('Environment mismatch')
     env = os.environ.copy()
     # Keep credentials explicitly scoped even if the parent shell sourced another service's env.
-    for key in ['JWT_PRIVATE_KEY_PATH','AUTH_ADMIN_USERNAME','AUTH_ADMIN_PASSWORD',
+    for key in ['JWT_PRIVATE_KEY_PATH','AUTH_PASSWORD_FINGERPRINT_KEY_PATH','AUTH_ADMIN_USERNAME','AUTH_ADMIN_PASSWORD',
                 'IDENTITY_DB_URL','IDENTITY_DB_USERNAME','IDENTITY_DB_PASSWORD',
                 'DB_USERNAME','DB_PASSWORD','REDIS_PASSWORD','RABBITMQ_USERNAME','RABBITMQ_PASSWORD']:
         env.pop(key,None)
@@ -40,6 +40,10 @@ def service_env(environment, service, bootstrap=False):
             env.pop('AUTH_ADMIN_PASSWORD', None)
     elif service == 'booking-service':
         env.update(load_env(private / 'backend.env'))
+    elif service == 'gateway':
+        # 网关只领取限流所需的 Redis 凭据，不领取数据库、签名私钥或管理员密码。
+        env.update(REDIS_HOST='127.0.0.1', REDIS_PORT='6379' if environment == 'dev' else '16379',
+                   REDIS_PASSWORD=source['REDIS_PASSWORD'])
     env['SPRING_PROFILES_ACTIVE'] = environment + ',business' + (',bootstrap-admin' if bootstrap else '')
     env['SERVER_ADDRESS'] = '127.0.0.1'
     return env

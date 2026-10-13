@@ -40,9 +40,16 @@ import importlib.util
 spec=importlib.util.spec_from_file_location('runtime',ROOT/'scripts/run-service.py')
 runtime=importlib.util.module_from_spec(spec);spec.loader.exec_module(runtime)
 auth={}
+fingerprints={}
 for env in ['dev','prod']:
     private=ROOT/'secrets'/env
     auth[env]=runtime.load_env(private/'auth.env')
+    identity=runtime.load_env(private/'identity.env')
+    fingerprint=Path(identity['AUTH_PASSWORD_FINGERPRINT_KEY_PATH'])
+    assert fingerprint.parent==private and not fingerprint.is_symlink()
+    fingerprints[env]=fingerprint.read_bytes()
+    assert len(fingerprints[env])==32 and stat.S_IMODE(fingerprint.stat().st_mode)==0o600
+    subprocess.run(['git','check-ignore','--quiet',str(fingerprint)],cwd=ROOT,check=True)
     for name in ['auth.env','identity.env','jwt-private.pem','jwt-public.pem']:
         path=private/name
         assert stat.S_IMODE(path.stat().st_mode)==0o600
@@ -53,6 +60,11 @@ for env in ['dev','prod']:
     for service in ['booking-service','gateway','ai-service']:
         child=runtime.service_env(env,service)
         assert 'JWT_PRIVATE_KEY_PATH' not in child and 'AUTH_ADMIN_PASSWORD' not in child and 'IDENTITY_DB_PASSWORD' not in child
+        assert 'AUTH_PASSWORD_FINGERPRINT_KEY_PATH' not in child
+        if service=='gateway':
+            assert child['REDIS_PASSWORD']==values[env]['REDIS_PASSWORD'] and 'DB_PASSWORD' not in child
 assert auth['dev']['JWT_PUBLIC_KEY_PATH']!=auth['prod']['JWT_PUBLIC_KEY_PATH']
 assert (ROOT/'secrets/dev/jwt-public.pem').read_bytes()!=(ROOT/'secrets/prod/jwt-public.pem').read_bytes()
 print('PASS: independent dev/prod JWT keys, issuer, audience and import directories; private signing key stays in identity service.')
+assert fingerprints['dev']!=fingerprints['prod']
+print('PASS: independent password fingerprint keys stay private to identity; gateway only receives its own Redis credential.')

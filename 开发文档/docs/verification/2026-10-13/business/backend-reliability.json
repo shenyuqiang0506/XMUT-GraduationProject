@@ -1,0 +1,53 @@
+{
+  "date": "2026-10-13",
+  "mode": "dev-business-real-infrastructure",
+  "checks": [
+    {
+      "check": "身份幂等记录有效期内回放并拒绝不同内容，过期后允许新请求",
+      "result": "PASS"
+    },
+    {
+      "check": "预约库幂等有效期和不同内容冲突行为一致",
+      "result": "PASS"
+    },
+    {
+      "check": "两个库定时清理过期成功记录，保留有效幂等记录、进行中记录及有效刷新历史",
+      "result": "PASS"
+    },
+    {
+      "check": "Redis Lua 并发总额度精确生效，伪造用户头无法绕过",
+      "result": "PASS"
+    },
+    {
+      "check": "限流窗口结束后额度恢复",
+      "result": "PASS"
+    },
+    {
+      "check": "搜索独立额度、统一 429 与 Retry-After 生效，普通读取仍可用",
+      "result": "PASS"
+    },
+    {
+      "check": "人员导入独立额度生效",
+      "result": "PASS"
+    },
+    {
+      "check": "Content-Length 超限提前返回统一 413",
+      "result": "PASS"
+    },
+    {
+      "check": "无 Content-Length 的分块超限请求同样返回 413",
+      "result": "PASS"
+    },
+    {
+      "check": "Redis 不可用时业务限流拒绝请求，未改写为 429，也未降级放行",
+      "result": "PASS"
+    },
+    {
+      "check": "额度耗尽仍允许退出撤销，旧令牌无法通过实时校验",
+      "result": "PASS"
+    }
+  ],
+  "passed": 11,
+  "failed": 0,
+  "scope": "过期记录、幂等有效期、并发业务限流、请求体上限和会话撤销；不代表生产容量压测"
+}

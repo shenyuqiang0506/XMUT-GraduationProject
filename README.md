@@ -117,6 +117,8 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/availability-smoke.py
 
 ## 验证记录
 
+- [后端可靠性与网关保护](开发文档/docs/development/18-后端可靠性与网关保护.md)
+
 - [演示接口下线与真实数据约定](开发文档/docs/development/15-演示接口下线与真实数据约定.md)
 
 - [依赖验证记录](开发文档/docs/development/09-依赖验证记录.md)

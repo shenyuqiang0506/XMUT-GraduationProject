@@ -67,7 +67,7 @@ java -jar GraduationProject/target/GraduationProject-0.0.1-SNAPSHOT.jar
 
 集成测试验证 MySQL/InnoDB 回滚、Redis 读写、RabbitMQ 消息收发、Nacos 配置导入与服务注册。测试只临时创建自己的表、key 和独占队列，结束后清理。M2 身份与目录 Flyway 迁移已完成；基础设施测试与正式 API 验收分别执行。
 
-`InfrastructureIT` 默认不执行，需要 `verify-dev.sh` 设置 `XMUT_INFRA_TEST=true`；该脚本固定为 dev，不对 prod 执行业务写入测试。普通 `mvn verify` 执行不依赖 Docker 的 12 项测试，包含工具与时间窗口边界验证。
+`InfrastructureIT` 默认不执行，需要 `verify-dev.sh` 设置 `XMUT_INFRA_TEST=true`；该脚本固定为 dev，不对 prod 执行业务写入测试。普通 `mvn verify` 执行工具、时间窗口、异常分类、身份调用及网关保护等单元与上下文测试。
 
 ## AI 配置与历史验证
 
@@ -150,6 +150,8 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/catalog-smoke.py
 测试进程使用独立 Nacos group；结束关闭自身进程，清理本轮随机前缀用户、资源、批次与文件，保留迁移和管理员。日志私密，公开摘要在 `开发文档/docs/verification/2026-10-11/m2/`。不要公开私密日志或完整 Compose 配置。
 
 ## M3 可用性基础
+
+已有环境升级后端保护时，先执行 `python3 deployment/scripts/migrate-fingerprint-key.py dev`，prod 配置准备使用同命令的 `prod` 参数，再重新执行 `prepare-idea.py`。新环境无需迁移，`init-auth.py` 会生成独立密码指纹密钥。网关现在需要本环境 Redis 凭据；启动器和 IDEA 准备脚本已适配。账户密码不变，密钥与环境文件仍被 Git 忽略。详见 [后端可靠性与网关保护](../开发文档/docs/development/18-后端可靠性与网关保护.md)。
 
 ```sh
 # 先停止已经运行的 Java / Web，再执行带浏览器的独立 dev 验收。

@@ -39,9 +39,15 @@ class Stack:
         env=runtime.service_env('dev',name,name=='identity-service')
         env.update(SERVER_PORT=str(port),MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED='true',
             SPRING_CLOUD_NACOS_DISCOVERY_GROUP=self.group,SPRING_CLOUD_NACOS_DISCOVERY_IP='127.0.0.1',SPRING_CLOUD_NACOS_DISCOVERY_GRACEFUL_SHUTDOWN_WAIT_TIME='0')
+        # 大量验收资料准备会集中调用导入接口；额度仍启用，专门的可靠性脚本另测低额度边界。
+        # 这些值只进入临时服务，不改动日常 dev/prod 配置。
+        if name=='gateway':
+            env.update(BUSINESS_RATE_GENERAL='1000', BUSINESS_RATE_SEARCH='200', BUSINESS_RATE_IMPORT='200')
         env.update(overrides or {})
         logs=PRIVATE/(self.label+'-logs');logs.mkdir(mode=0o700,exist_ok=True)
-        fd=os.open(logs/(name+'.log'),os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600);log=os.fdopen(fd,'w')
+        # 同一轮可能额外启动故障配置网关，保留各实例日志，不能截断正在运行实例的日志。
+        filename=name+'-'+str(port)+'.log' if any(n==name for n,_,_ in self.children) else name+'.log'
+        fd=os.open(logs/filename,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600);log=os.fdopen(fd,'w')
         module='GraduationProject' if name=='booking-service' else name
         child=subprocess.Popen(['java','-jar',str(REPO/module/'target'/(module+'-0.0.1-SNAPSHOT.jar'))],env=env,cwd=REPO,stdout=log,stderr=subprocess.STDOUT)
         self.children.append((name,child,log))

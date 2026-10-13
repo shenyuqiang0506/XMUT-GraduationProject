@@ -75,7 +75,7 @@ AI 服务保留 Spring AI 依赖、模型配置与身份接入骨架，正式 AI
 
 已有 `deployment/.env.ai` 继续作为本机私密配置保留，包含 `AI_BASE_URL`、`AI_MODEL`、`AI_API_KEY`，权限 600 且 Git 忽略。不要将真实密钥写入公开文件。历史调用结果保存在 `开发文档/docs/verification/2026-10-11/m1/`，只说明当时通过了技术验证，不是现行操作指令。
 
-正式业务通过 `dev,business` 启动并使用 JWT 认证。回归执行 `auth-smoke.py`、`catalog-smoke.py` 与 `availability-smoke.py`；新报告按上海日期写入 `开发文档/docs/verification/<日期>/business/`，不覆盖历史阶段记录。
+正式业务通过 `dev,business` 启动并使用 JWT 认证。回归执行 `auth-smoke.py`、`catalog-smoke.py`、`availability-smoke.py` 与 `applications-smoke.py`；新报告按上海日期写入 `开发文档/docs/verification/<日期>/business/`，不覆盖历史阶段记录。
 
 ## 停止、重启与数据
 
@@ -156,8 +156,9 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/catalog-smoke.py
 ```sh
 # 先停止已经运行的 Java / Web，再执行带浏览器的独立 dev 验收。
 XMUT_WEB_TEST=1 python3 deployment/scripts/availability-smoke.py
+XMUT_WEB_TEST=1 python3 deployment/scripts/applications-smoke.py
 ```
 
 脚本使用真实 MySQL / Redis / Nacos，临时创建自己的来源、资源、账号和明确标记的测试策略，检查覆盖、开放、占用、组合与事务回滚；结束后清理本轮资料，恢复原生效策略并停止自己启动的进程。新执行的公开结果位于 `开发文档/docs/verification/<日期>/business/`，原阶段证据保留在 `2026-10-11/m3/`，私密日志不进 Git。
 
-M3 的 Flyway V2 已在本机 dev 执行，不得重新排版；以后结构变更新增迁移。新环境策略为空，需系统管理员依据已确认制度显式配置 REAL，页面默认 REAL，规则缺失时留空并由管理员依据制度填写。联合申请 / 审批 / 取消尚待下一步，当前查询不创建暂占。详细字段、接口与恢复说明见 [M3 可用性基础验收](../开发文档/docs/development/14-M3可用性基础验收.md)。
+M3 的 Flyway V2 已在本机 dev 执行，不得重新排版；以后结构变更新增迁移。新环境策略为空，需系统管理员依据已确认制度显式配置 REAL，页面默认 REAL，规则缺失时留空并由管理员依据制度填写。V3 已在本机 dev 建立联合申请、整组暂占、审批、到期补偿与 Outbox。V3 同样必须保持已执行原文，后续结构变更新增版本。查询不预留资源，提交后才暂占，授权批准后方可使用；Outbox 投递与通知属于 M4。预约写事务 READ COMMITTED，读取快照 REPEATABLE READ。详细接口、固定协调行的串行化边界、私密备份及恢复说明见 [M3 联合预约闭环](../开发文档/docs/development/19-M3联合预约闭环.md)。

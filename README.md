@@ -2,18 +2,18 @@
 
 校园资源预约毕业设计：计划提供场地与设备联合预约、审批、候补、通知及 AI 查询，覆盖 Web 管理端和 iOS/Android 学生端。
 
-已完成 M1 后端调用链与 M2 身份、资源目录、Excel/JSON 导入、Web 基础管理页，本机 dev 基础服务已部署。M3 已补齐来源覆盖、占用、开放规则、策略与可用组合查询，联合申请与审批待继续开发，移动端按用户要求暂缓。完整设计见 [开发文档](开发文档/开发文档.md)，当前实现范围见 [M3 可用性基础验收](开发文档/docs/development/14-M3可用性基础验收.md)。
+已完成 M1 后端调用链与 M2 身份、资源目录、Excel/JSON 导入、Web 基础管理页，本机 dev 基础服务已部署。M3 已补齐来源覆盖、开放规则、策略、可用组合查询与联合预约、审批、取消和冲突复核闭环，移动端按用户要求暂缓。完整设计见 [开发文档](开发文档/开发文档.md)，当前实现范围见 [M3 联合预约闭环](开发文档/docs/development/19-M3联合预约闭环.md)。
 
 ## 工程结构
 
-- `GraduationProject/`：booking-service，保留原目录和制品名；正式资源目录、导入、可用性、开放占用管理、审批组与管理范围。
+- `GraduationProject/`：booking-service，保留原目录和制品名；正式资源目录、导入、可用性、联合申请与整组占用、审批、开放占用管理、审批组与管理范围。
 - `identity-service/`：本地账号、BCrypt、JWT/刷新会话、角色与账号启停。
 - `ai-service/`：保留 Spring AI 依赖、模型配置和身份接入骨架；演示接口已移除，正式 AI 业务待实现。
 - `gateway/`：WebFlux 网关、JWT 校验和 Nacos/LoadBalancer 路由。
 - `common-contracts/`：统一响应、身份与 traceId 契约。
 - `security-core/`：共享 RSA 密钥读取与 JWT 校验，不向网关引入 MVC/JDBC。
 - `service-support/`：MVC traceId、实时身份检查、Feign 请求头和错误处理。
-- `web-admin/`：Vue 3 + TypeScript + Element Plus，登录、目录、可用时段、开放占用管理、导入和账号页。
+- `web-admin/`：Vue 3 + TypeScript + Element Plus，登录、目录、可用时段、联合申请、审批、开放占用管理、导入和账号页。
 - `pom.xml`：统一版本管理并聚合七个 Java 模块。
 - `开发文档/`：需求、架构、数据库、接口与验收设计。
 - `deployment/`：dev/prod 独立 Docker 配置、私密凭据生成与真实服务验证。
@@ -54,9 +54,9 @@ python3 deployment/scripts/prepare-idea.py
 
 `.mvn/settings.xml` 统一到 Maven Central，避免第三方 POM 附带的私有仓库导致认证失败。依赖使用正式发布版，完整解析树可运行 `dependency:tree` 查看。
 
-七个 Java 模块统一引入 Lombok（由 Boot 管理，当前 1.18.46）和 Hutool 全量包（5.8.47）。Lombok 使用 `provided` 范围并配置注解处理器，排除出可执行 JAR；Hutool 可直接使用 `cn.hutool.*`。IDEA 同步 Maven 后会导入依赖与处理器配置。13 个纯依赖注入类使用 `@RequiredArgsConstructor`；包内构造器保留 `AccessLevel.PACKAGE`，依赖字段顺序保持原构造器参数顺序。带配置参数、校验或初始化逻辑的构造器仍显式编写，DTO 继续使用 `record`，Hutool 后续按需使用。
+七个 Java 模块统一引入 Lombok（由 Boot 管理，当前 1.18.46）和 Hutool 全量包（5.8.47）。Lombok 使用 `provided` 范围并配置注解处理器，排除出可执行 JAR；Hutool 可直接使用 `cn.hutool.*`。IDEA 同步 Maven 后会导入依赖与处理器配置。纯依赖注入类使用 `@RequiredArgsConstructor`；包内构造器保留 `AccessLevel.PACKAGE`，依赖字段顺序保持原构造器参数顺序。带配置参数、校验或初始化逻辑的构造器仍显式编写，DTO 继续使用 `record`，Hutool 后续按需使用。
 
-普通 `verify` 执行 12 项测试（基础装配 / 工具及时间窗口边界），包含 Lombok 生成构造器/getter 与 Hutool 调用验证；H2 只能验证装配，不能证明 MySQL 事务与锁行为。真实基础服务验证使用 `deployment/scripts/verify-dev.sh`；正式身份、目录与 Web 使用下面的验收脚本。详细操作见 [部署说明](deployment/README.md)。
+普通 `verify` 执行 Java 单元及装配测试（本轮 51 项，涵盖基础装配、工具、时间边界、身份与网关规则），包含 Lombok 生成构造器/getter 与 Hutool 调用验证；H2 只能验证装配，不能证明 MySQL 事务与锁行为。真实基础服务验证使用 `deployment/scripts/verify-dev.sh`；正式身份、目录与 Web 使用下面的验收脚本。详细操作见 [部署说明](deployment/README.md)。
 
 ## M2 本机运行
 
@@ -94,9 +94,10 @@ Web 新增“可用时段查询”“开放与占用管理”；资料导入支�
 
 ```sh
 XMUT_WEB_TEST=1 python3 deployment/scripts/availability-smoke.py
+XMUT_WEB_TEST=1 python3 deployment/scripts/applications-smoke.py
 ```
 
-覆盖缺失、部分或过期不视为空闲；完整快照只替换声明窗口，空闲导入只证明文件实际区间。查询结果不会暂占资源，联合申请 / 审批 / 取消仍待 M3 下一步。详见 [接口与验收说明](开发文档/docs/development/14-M3可用性基础验收.md)。
+覆盖缺失、部分或过期不视为空闲；完整快照只替换声明窗口，空闲导入只证明文件实际区间。查询结果不会暂占资源，提交申请会在重新校验后暂占整组资源，授权审批后才转为批准占用。新增“我的申请”“预约审批”页面。详见 [联合预约接口与验收说明](开发文档/docs/development/19-M3联合预约闭环.md)。
 
 ## 运行配置
 
@@ -117,6 +118,7 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/availability-smoke.py
 
 ## 验证记录
 
+- [M3 联合预约闭环](开发文档/docs/development/19-M3联合预约闭环.md)
 - [后端可靠性与网关保护](开发文档/docs/development/18-后端可靠性与网关保护.md)
 
 - [演示接口下线与真实数据约定](开发文档/docs/development/15-演示接口下线与真实数据约定.md)

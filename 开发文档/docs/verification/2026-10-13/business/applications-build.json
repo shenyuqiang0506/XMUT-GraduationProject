@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-13",
+  "scope": "M3 联合预约闭环，本机 dev；移动端、候补、消息投递和线上部署未验收",
+  "java": {
+    "command": "./GraduationProject/mvnw -s .mvn/settings.xml -B -ntp verify",
+    "result": "PASS",
+    "tests": 51,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "webBuild": {
+    "command": "npm run build",
+    "result": "PASS",
+    "includes": "Vue/TypeScript、测试 TypeScript、Vite 生产构建",
+    "warnings": [
+      "既有主包超过 500 kB 的 Vite 提示，不影响构建通过"
+    ]
+  },
+  "frontendRegression": {
+    "command": "npm run test:frontend",
+    "passed": 16,
+    "failed": 0
+  },
+  "applications": {
+    "realApiGroups": 19,
+    "webScenarios": 3,
+    "report": "applications.json",
+    "result": "PASS"
+  },
+  "regression": {
+    "authentication": {
+      "passed": 16,
+      "failed": 0
+    },
+    "catalog-import": {
+      "passed": 14,
+      "failed": 0
+    },
+    "availability": {
+      "passed": 15,
+      "failed": 0
+    },
+    "personnel-accounts": {
+      "passed": 9,
+      "failed": 0
+    },
+    "backend-reliability": {
+      "passed": 11,
+      "failed": 0
+    }
+  },
+  "ideaStartup": {
+    "command": "python3 deployment/scripts/verify-idea.py",
+    "result": "PASS"
+  },
+  "database": {
+    "flywayVersions": [
+      "1",
+      "2",
+      "3"
+    ],
+    "backupBeforeV3": true,
+    "backupIgnored": true,
+    "backupPermissions": "600",
+    "syntheticApplicationsRemaining": 0,
+    "syntheticOutboxRemaining": 0,
+    "rollbackScriptExecuted": false
+  },
+  "processes": {
+    "temporaryPortsReleased": [
+      8081,
+      8082,
+      8083,
+      5173,
+      18082,
+      18083
+    ],
+    "prodStarted": false,
+    "dockerDevServicesRunning": 4
+  },
+  "limits": [
+    "固定写协调行串行化业务写入，本轮未进行吞吐压测",
+    "身份资格查询与预约提交不是跨库原子事务",
+    "Outbox 仅持久化 PENDING，RabbitMQ 投递与通知消费者属于 M4"
+  ]
+}

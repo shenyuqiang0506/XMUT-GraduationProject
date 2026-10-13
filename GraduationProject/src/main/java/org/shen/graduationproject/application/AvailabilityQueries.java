@@ -9,6 +9,7 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.shen.graduationproject.domain.AvailabilityCommands.*;
 import org.shen.graduationproject.domain.TimeWindow;
+import org.shen.graduationproject.domain.EquipmentIndex;
 import org.shen.graduationproject.infrastructure.*;
 import org.shen.platform.contracts.AuthActor;
 import org.shen.platform.support.BusinessException;
@@ -231,20 +232,30 @@ public class AvailabilityQueries {
         Snapshot data = load(all, window);
         // 设备先独立通过可用性检查，再按组、校区、类型匹配场地；SQL 已按 ID 排序，选择结果可重复。
         var usable = equipment.stream().filter(r -> "AVAILABLE".equals(status(r, window, policy, now, data))).toList();
+        var index = new EquipmentIndex(usable);
+        var plans = matchPlans(venues, requirements, index, window, policy, now, data, input.dataMode());
+        // 分页作用于已通过全部校验的场地组合，total 是可行场地数，而非初始候选数。
+        int offset = Math.min(plans.size(), (input.page() - 1) * input.size());
+        // 结果是当前快照，不创建暂占；后续提交联合预约时必须再次锁资源并校验。
+        return Map.of("items", plans.subList(offset, Math.min(plans.size(), offset + input.size())), "page", input.page(),
+                "size", input.size(), "total", plans.size(), "checkedAt", TimeWindow.display(now));
+    }
+
+    /** 组合匹配与 SQL 查询分开，复用设备索引，避免每个场地、每类需求反复扫描全体设备。 */
+    private List<Map<String, Object>> matchPlans(List<Map<String, Object>> venues, List<EquipmentRequirement> requirements,
+            EquipmentIndex index, TimeWindow window, BookingPolicies.Active policy, Instant now, Snapshot data, String mode) {
         var plans = new ArrayList<Map<String, Object>>();
         for (var venue : venues) {
             if (!"AVAILABLE".equals(status(venue, window, policy, now, data))) continue;
             var selected = new ArrayList<String>();
             boolean enough = true;
             for (var need : requirements) {
-                var candidates = usable.stream().filter(r -> Objects.equals(r.get("approval_group_id"), venue.get("approval_group_id"))
-                                && Objects.equals(r.get("campus"), venue.get("campus")) && need.type().equals(r.get("equipment_type")))
-                        .limit(need.count()).toList();
+                var candidates = index.select(venue, need.type(), need.count());
                 if (candidates.size() != need.count()) {
                     enough = false;
                     break;
                 }
-                candidates.forEach(r -> selected.add(Long.toString(id(r))));
+                selected.addAll(candidates);
             }
             if (!enough) continue;
             selected.sort(Comparator.comparingLong(Long::parseLong));
@@ -253,12 +264,8 @@ public class AvailabilityQueries {
             members.sort(Comparator.comparingLong(Long::parseLong));
             plans.add(Map.of("venueId", Long.toString(id(venue)), "venueName", venue.get("name"), "equipmentIds", selected,
                     "resourceIds", members, "approvalGroupId", venue.get("approval_group_id").toString(), "availability", "AVAILABLE",
-                    "coverageStatus", "COMPLETE", "dataMode", input.dataMode(), "checkedAt", TimeWindow.display(now), "policyVersion", policy.version()));
+                    "coverageStatus", "COMPLETE", "dataMode", mode, "checkedAt", TimeWindow.display(now), "policyVersion", policy.version()));
         }
-        // 分页作用于已通过全部校验的场地组合，total 是可行场地数，而非初始候选数。
-        int offset = Math.min(plans.size(), (input.page() - 1) * input.size());
-        // 结果是当前快照，不创建暂占；后续提交联合预约时必须再次锁资源并校验。
-        return Map.of("items", plans.subList(offset, Math.min(plans.size(), offset + input.size())), "page", input.page(),
-                "size", input.size(), "total", plans.size(), "checkedAt", TimeWindow.display(now));
+        return plans;
     }
 }

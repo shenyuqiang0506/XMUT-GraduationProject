@@ -52,7 +52,13 @@ public class CatalogIdempotency {
         String hash = ImportStorage.hash(json.writeValueAsString(canonical(json.convertValue(payload, Object.class))).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         return transactions.execute(tx -> {
             sql.update("INSERT INTO idempotency_record(actor_id,operation,request_key,payload_hash,status,expires_at) VALUES (?,?,?,?,'IN_PROGRESS',UTC_TIMESTAMP(3)+INTERVAL 1 DAY) ON DUPLICATE KEY UPDATE id=id", Long.parseLong(actor.userId()), operation, key, hash);
-            var row = sql.queryForMap("SELECT * FROM idempotency_record WHERE actor_id=? AND operation=? AND request_key=? FOR UPDATE", Long.parseLong(actor.userId()), operation, key);
+            var row = sql.queryForMap("SELECT *,expires_at<=UTC_TIMESTAMP(3) AS expired FROM idempotency_record WHERE actor_id=? AND operation=? AND request_key=? FOR UPDATE", Long.parseLong(actor.userId()), operation, key);
+            // 在行锁内重置已过期的成功记录。即使清理任务尚未运行，一天有效期也会生效。
+            if ("SUCCEEDED".equals(row.get("status")) && ((Number) row.get("expired")).intValue() == 1) {
+                sql.update("UPDATE idempotency_record SET payload_hash=?,status='IN_PROGRESS',http_status=NULL,response_body=NULL,expires_at=UTC_TIMESTAMP(3)+INTERVAL 1 DAY WHERE id=?", hash, row.get("id"));
+                row.put("payload_hash", hash);
+                row.put("status", "IN_PROGRESS");
+            }
             if (!hash.equals(row.get("payload_hash")))
                 throw new BusinessException(409, "IDEMPOTENCY_KEY_REUSED", "同一幂等键对应的请求内容不同");
             if ("SUCCEEDED".equals(row.get("status")))

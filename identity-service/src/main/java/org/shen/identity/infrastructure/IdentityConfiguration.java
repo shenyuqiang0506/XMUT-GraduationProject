@@ -5,6 +5,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.shen.platform.support.ExpiredRecordCleaner;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 身份模块的密码编码配置。
@@ -12,7 +15,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  */
 @Configuration(proxyBeanMethods = false)
 @Profile("business")
+@EnableScheduling
 class IdentityConfiguration {
+    @Bean
+    ExpiredRecordCleaner identityExpiredRecords(JdbcTemplate sql) {
+        return new ExpiredRecordCleaner(sql, true);
+    }
+
     @Bean
     PasswordEncoder businessPasswords() {
         return new BCryptPasswordEncoder(12);

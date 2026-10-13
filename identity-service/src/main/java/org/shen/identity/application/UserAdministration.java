@@ -65,12 +65,18 @@ public class UserAdministration {
             return transactions.execute(tx -> {
                 repo.sql().update("INSERT INTO idempotency_record(actor_id,operation,request_key,payload_hash,status,expires_at) VALUES (?,?,?,?,'IN_PROGRESS',UTC_TIMESTAMP(3)+INTERVAL 1 DAY) ON DUPLICATE KEY UPDATE id=id",
                         Long.parseLong(actor.userId()), operation, key, hash);
-                var row = repo.sql().queryForMap("SELECT * FROM idempotency_record WHERE actor_id=? AND operation=? AND request_key=? FOR UPDATE", Long.parseLong(actor.userId()), operation, key);
+                var row = repo.sql().queryForMap("SELECT *,expires_at<=UTC_TIMESTAMP(3) AS expired FROM idempotency_record WHERE actor_id=? AND operation=? AND request_key=? FOR UPDATE", Long.parseLong(actor.userId()), operation, key);
                 // 通过守卫行串行化账号管理，即使两个管理员互相修改，也保持一致的加锁顺序。
                 repo.sql().queryForObject("SELECT id FROM identity_admin_guard WHERE id=1 FOR UPDATE", Integer.class);
                 long target = operation.contains(":") ? Long.parseLong(operation.substring(operation.indexOf(':') + 1)) : Long.parseLong(actor.userId());
                 repo.sql().queryForList("SELECT id FROM `user` WHERE id IN (?,?) ORDER BY id FOR UPDATE", Long.class, Long.parseLong(actor.userId()), target);
                 requireAdmin(actor);
+                // 先重新确认管理员权限，再在同一行锁内重置过期记录，避免无限期回放旧响应。
+                if ("SUCCEEDED".equals(row.get("status")) && ((Number) row.get("expired")).intValue() == 1) {
+                    repo.sql().update("UPDATE idempotency_record SET payload_hash=?,status='IN_PROGRESS',http_status=NULL,response_body=NULL,expires_at=UTC_TIMESTAMP(3)+INTERVAL 1 DAY WHERE id=?", hash, row.get("id"));
+                    row.put("payload_hash", hash);
+                    row.put("status", "IN_PROGRESS");
+                }
                 if (!hash.equals(row.get("payload_hash")))
                     throw new BusinessException(409, "IDEMPOTENCY_KEY_REUSED", "同一幂等键对应的请求内容不同");
                 if ("SUCCEEDED".equals(row.get("status")))

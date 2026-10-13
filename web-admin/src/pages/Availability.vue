@@ -4,7 +4,7 @@
  * 结果是服务端检查时刻的快照，页面展示不会锁定资源或创建预约申请。
  */
 import {ref, onMounted} from 'vue'
-import {api, explain, mutationKeys} from '../api/client'
+import {api, ApiError, explain, mutationKeys} from '../api/client'
 import {useSession} from '../stores/session'
 import {useRouter} from 'vue-router'
 import {ElMessage} from 'element-plus'
@@ -53,6 +53,7 @@ const busy = ref(false), error = ref('')
 const session=useSession(), router=useRouter(), keys=mutationKeys()
 // 保存查询成功时的条件，申请使用这份快照，不读取后来被编辑的筛选字段。
 const searched=ref<{startAt:string;endAt:string;participantCount:number;requiredFeatures:string[]}>()
+const canWaitlist=ref(false)
 const bookingDialog=ref(false), bookingPlan=ref<Plan>(), activityName=ref(''), description=ref('')
 const labels: Record<string, string> = {COMPLETE: '已确认完整覆盖', PARTIAL: '仅部分覆盖', UNKNOWN: '覆盖待核实'}
 const featureOptions = [{code: 'PROJECTOR', label: '投影'}, {code: 'WHITEBOARD', label: '白板'}, {
@@ -108,22 +109,23 @@ async function search() {
 
 function prepareBooking(plan: Plan) {
   if (busy.value || !session.applicant || !searched.value) return
-  bookingPlan.value=plan; activityName.value=''; description.value=''; error.value=''; bookingDialog.value=true
+  canWaitlist.value=false; bookingPlan.value=plan; activityName.value=''; description.value=''; error.value=''; bookingDialog.value=true
 }
 
-async function submitBooking() {
+async function submitBooking(waitlist=false) {
   const plan=bookingPlan.value, intent=searched.value
   if (busy.value || !plan || !intent) return
   if (!activityName.value.trim()) { error.value='请填写活动名称'; return }
   const payload={...intent,activityName:activityName.value.trim(),description:description.value.trim() || null,
     venueId:plan.venueId,equipmentIds:[...plan.equipmentIds]}
+  const scope=waitlist?'WAITLIST_CREATE':'APPLICATION_CREATE'
   busy.value=true; error.value=''
   try {
-    await api<ApplicationDetail>('/applications','POST',payload,keys.key('APPLICATION_CREATE',payload))
-    keys.done('APPLICATION_CREATE',payload); bookingDialog.value=false
-    ElMessage.success('申请已提交，等待审批；可在我的申请查看当前状态')
-    await router.push('/applications')
-  } catch(e) { error.value=explain(e) } finally { busy.value=false }
+    await api<ApplicationDetail>(waitlist?'/waitlists':'/applications','POST',payload,keys.key(scope,payload))
+    keys.done(scope,payload); bookingDialog.value=false
+    ElMessage.success(waitlist?'已加入候补，等待整组资源可用':'申请已提交，等待审批；可在我的申请查看当前状态')
+    await router.push(waitlist?'/waitlists':'/applications')
+  } catch(e) { error.value=explain(e); if(e instanceof ApiError && ['RESOURCE_CONFLICT','WAITLIST_PRIORITY'].includes(e.code))canWaitlist.value=true } finally { busy.value=false }
 }
 
 // 使用同一查询窗口读取指定资源的日历，切换资源时清除旧日历，避免混淆覆盖证据。
@@ -271,7 +273,7 @@ function display(value: string) {
           <template #default="{row}">{{ display(row.endAt) }}</template>
         </el-table-column>
         <el-table-column label="类别">
-          <template #default="{row}">{{ ({EXTERNAL:'外部占用',HOLD:'待审批暂占',CONFIRMED:'已批准预约',CONFLICT_REVIEW:'冲突待复核占用'} as Record<string,string>)[row.type] || '占用' }}</template>
+          <template #default="{row}">{{ ({EXTERNAL:'外部占用',HOLD:'待审批暂占',WAITLIST_HOLD:'候补待确认暂占',CONFIRMED:'已批准预约',CONFLICT_REVIEW:'冲突待复核占用'} as Record<string,string>)[row.type] || '占用' }}</template>
         </el-table-column>
       </el-table>
     </div>
@@ -281,11 +283,12 @@ function display(value: string) {
       <p>{{ bookingPlan.venueName }} · {{ searched.participantCount }} 人</p>
       <p>{{ display(searched.startAt) }} 至 {{ display(searched.endAt) }}（上海时间）</p>
       <p>设备编号：{{ bookingPlan.equipmentIds.join('、') || '无需设备' }}</p>
-      <el-form label-position="top" :disabled="busy" @submit.prevent="submitBooking">
+      <el-form label-position="top" :disabled="busy" @submit.prevent="submitBooking(false)">
         <el-form-item label="活动名称"><el-input v-model="activityName" maxlength="200" data-testid="booking-name"/></el-form-item>
         <el-form-item label="活动说明"><el-input v-model="description" type="textarea" maxlength="2000" :rows="4" data-testid="booking-description"/></el-form-item>
         <p v-if="error" class="error" role="alert">{{ error }}</p>
         <el-button native-type="submit" type="primary" :loading="busy">确认提交申请</el-button>
+        <el-button v-if="canWaitlist" :disabled="busy" @click="submitBooking(true)">按此组合加入候补</el-button>
       </el-form>
     </div>
   </el-dialog>

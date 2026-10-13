@@ -12,6 +12,9 @@ import Availability from '../pages/Availability.vue'
 import Rules from '../pages/Rules.vue'
 import Applications from '../pages/Applications.vue'
 import Approvals from '../pages/Approvals.vue'
+import Waitlists from '../pages/Waitlists.vue'
+import Notifications from '../pages/Notifications.vue'
+import EventDelivery from '../pages/EventDelivery.vue'
 
 export const router = createRouter({
     history: createWebHistory(),
@@ -19,6 +22,8 @@ export const router = createRouter({
         path: '/resources',
         component: Resources
     }, {path: '/availability', component: Availability}, {path:'/applications',component:Applications},
+        {path:'/waitlists',component:Waitlists}, {path:'/notifications',component:Notifications},
+        {path:'/event-delivery',component:EventDelivery,meta:{admin:true}},
         {path:'/approvals',component:Approvals,meta:{manager:true}}, {
         path: '/rules',
         component: Rules,

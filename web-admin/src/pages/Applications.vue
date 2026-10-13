@@ -3,11 +3,13 @@
  * 本人申请与审批列表共用展示；管理视图使用独立路由包装，切换后重新创建状态。
  * 详情提供服务端 allowedActions，提交携带版本与幂等键；冲突后刷新详情并由用户重新决定。
  */
-import {ref, onMounted} from 'vue'
+import {ref, onMounted, watch} from 'vue'
+import {useRoute} from 'vue-router'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
 import type {ApplicationSummary, ApplicationDetail, ApplicationStatus, Page} from '../types'
 
+const route=useRoute()
 const props = defineProps<{administrative?: boolean}>()
 const items = ref<ApplicationSummary[]>([]), total = ref(0), page = ref(1), status = ref('')
 const selected = ref<ApplicationDetail>(), dialog = ref(false), reason = ref(''), busy = ref(false), error = ref('')
@@ -30,7 +32,7 @@ async function load() {
   try { await rows() } catch(e) { error.value=explain(e) } finally { busy.value=false }
 }
 async function filter() { page.value=1; await load() }
-onMounted(load)
+onMounted(async()=>{await load();if(typeof route.query.id==='string'&&/^[1-9]\d*$/.test(route.query.id))await detail(route.query.id)})
 
 async function detail(id: string) {
   if (busy.value) return
@@ -62,6 +64,7 @@ async function act(action: string) {
     try { selected.value=await api<ApplicationDetail>('/applications/'+current.applicationId) } catch { /* 保留原操作错误提示。 */ }
   } finally { busy.value=false }
 }
+watch(()=>route.query.id,id=>{if(typeof id==='string'&&/^[1-9]\d*$/.test(id))detail(id)})
 </script>
 <template>
   <h1>{{ administrative ? '预约审批' : '我的申请' }}</h1>

@@ -104,3 +104,24 @@ export interface ApplicationDetail extends ApplicationSummary {
     resources: {id: string; name: string; resourceType: string; campus: string | null; equipmentType: string | null}[];
     approvalRecords: {operatorId: string | null; decision: string; reason: string | null; fromVersion: number; createdAt: string}[]
 }
+
+/** 候补确认产生待审批申请；CONFIRMED 不等于预约审批通过。 */
+export type WaitlistStatus='WAITING'|'OFFERED'|'CONFIRMED'|'EXPIRED'|'CANCELLED'
+export interface WaitlistSummary {
+ waitlistId:string;groupId:string;activityName:string;participantCount:number;status:WaitlistStatus;version:number;
+ dataMode:string;startAt:string;endAt:string;expiresAt:string;offerExpiresAt:string|null;applicationId:string|null;
+ lastReason:string|null;updatedAt:string;queuePosition:number|null;allowedActions:string[]
+}
+export interface WaitlistDetail extends WaitlistSummary {
+ description:string|null;resourceIds:string[];requiredFeatures:string[];
+ resources:{id:string;name:string;resourceType:string}[]
+}
+export interface Notice {
+ notificationId:string;title:string;body:string;kind:string;objectType:'APPLICATION'|'WAITLIST';objectId:string;
+ aggregateVersion:number;occurredAt:string;createdAt:string;readAt:string|null
+}
+export interface EventDelivery {
+ id:string;eventId:string;eventType:string;objectType:string;objectId:string;aggregateVersion:number;
+ status:'PENDING'|'SENDING'|'SENT'|'FAILED';attempts:number;version:number;lastErrorCode:string|null;
+ nextAttemptAt:string;publishedAt:string|null;deadLetteredAt:string|null
+}

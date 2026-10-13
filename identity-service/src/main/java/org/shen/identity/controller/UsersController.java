@@ -41,6 +41,27 @@ class UsersController {
     }
 
     /**
+     * 预留给人员名单及未来 Excel/CSV 适配器的统一 JSON 预览入口，不持久化密码。
+     * 与其他 /users 管理接口一致，仅系统管理员可调用。
+     */
+    @PostMapping("/users/imports/preview")
+    ResponseEntity<?> previewPersonnel(@AuthenticationPrincipal AuthActor actor,
+                                       @Valid @RequestBody AuthCommands.PersonnelImport request) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(ApiResponse.success(users.previewPersonnel(actor, request), MDC.get(TraceIds.MDC_KEY)));
+    }
+
+    /**
+     * 确认开户必须携带幂等键；相同名单和密码重试回放结果，任一失败则整批回滚。
+     */
+    @PostMapping("/users/imports")
+    ResponseEntity<?> importPersonnel(@AuthenticationPrincipal AuthActor actor,
+                                      @RequestHeader("Idempotency-Key") String key,
+                                      @Valid @RequestBody AuthCommands.PersonnelImport request) {
+        return response(users.importPersonnel(actor, key, request));
+    }
+
+    /**
      * 创建账号，初始密码只作为输入，响应不会回传密码或其摘要。
      */
     @PostMapping("/users")

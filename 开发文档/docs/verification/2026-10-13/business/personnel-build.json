@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-13",
+  "scope": "教师角色、学号工号默认账号与 JSON 人员批量开户",
+  "mavenVerify": "PASS",
+  "javaTests": 18,
+  "personnelInputTests": 6,
+  "webTypeCheckAndBuild": "PASS",
+  "personnelBackendChecks": 8,
+  "personnelBrowserScenarios": 2,
+  "authenticationChecks": 16,
+  "catalogBackendChecks": 13,
+  "catalogBrowserScenarios": 3,
+  "temporaryPortsReleased": {
+    "8081": true,
+    "8082": true,
+    "8083": true,
+    "5173": true
+  },
+  "productionDeployment": false,
+  "realPersonnelDatasetImported": false
+}

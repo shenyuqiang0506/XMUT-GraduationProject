@@ -14,7 +14,7 @@ export const useSession = defineStore('session', () => {
     const deviceId = localStorage.getItem('xmut-device') || crypto.randomUUID()
     localStorage.setItem('xmut-device', deviceId)
     const signedIn = computed(() => !!accessToken.value && !!actor.value)
-    const manager = computed(() => actor.value?.roles.some(r => r !== 'STUDENT') ?? false)
+    const manager = computed(() => actor.value?.roles.some(r => r === 'RESOURCE_ADMIN' || r === 'SYSTEM_ADMIN') ?? false)
     const admin = computed(() => actor.value?.roles.includes('SYSTEM_ADMIN') ?? false)
 
     // 清理页面身份及令牌；保留设备编号，使下一次登录仍能被服务端识别为同一设备。

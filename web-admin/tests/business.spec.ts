@@ -66,7 +66,7 @@ test('administrator: real login, one concurrent refresh, resource CRUD, users, i
     await page.getByRole('menuitem', {name: '账号与权限'}).click();
     await page.getByRole('button', {name: '创建账号', exact: true}).click();
     const create = page.getByRole('dialog', {name: '创建账号'});
-    await create.getByLabel('账号', {exact: true}).fill(prefix + '_web');
+    await create.getByLabel('学号', {exact: true}).fill(prefix + '_web');
     await create.getByLabel('姓名', {exact: true}).fill('DEMO Web account');
     await create.getByLabel('初始密码（12–72 字节）', {exact: true}).fill(required('TEST_USER_PASSWORD'));
     await create.getByRole('button', {name: '创建账号', exact: true}).click();

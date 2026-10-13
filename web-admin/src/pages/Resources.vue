@@ -140,7 +140,7 @@ async function groupCreate() {
 async function openGroups() {
   try {
     await loadGroups();
-    managers.value = (await api<Page<User>>('/users?size=100')).items.filter(u => u.status === 'ACTIVE' && u.roles.some(r => r !== 'STUDENT'));
+    managers.value = (await api<Page<User>>('/users?size=100')).items.filter(u => u.status === 'ACTIVE' && u.roles.some(r => r === 'RESOURCE_ADMIN' || r === 'SYSTEM_ADMIN'));
     groupDialog.value = true
   } catch (e) {
     ElMessage.error(explain(e))

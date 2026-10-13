@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.function.Supplier;
 
 import org.shen.identity.domain.AuthCommands;
+import org.shen.identity.domain.PersonnelAccounts;
 import org.shen.identity.infrastructure.*;
 import org.shen.platform.contracts.AuthActor;
 import org.shen.platform.support.BusinessException;
@@ -93,6 +94,57 @@ public class UserAdministration {
             long id = repo.createUser(command.username(), encoded, command.displayName(), command.roleCodes());
             repo.audit(Long.parseLong(actor.userId()), "CREATE_USER", id, null, "ACTIVE");
             return new Mutation(201, view(repo.user(id, false)), false);
+        });
+    }
+
+    /**
+     * 预览只检查输入和已有账号，不保存人员名单或密码，也不预占账号名。
+     * 学号、工号共用登录名唯一空间；发现碰撞时应核对源数据，不自动改名或覆盖账号。
+     */
+    public Map<String, Object> previewPersonnel(AuthActor actor, AuthCommands.PersonnelImport command) {
+        requireAdmin(actor);
+        var prepared = PersonnelAccounts.prepare(command);
+        var errors = new ArrayList<>(prepared.errors());
+        var items = new ArrayList<Map<String, Object>>();
+        if (errors.isEmpty()) {
+            for (int index = 0; index < prepared.users().size(); index++) {
+                var user = prepared.users().get(index);
+                int row = index + 1;
+                if (repo.username(user.username(), false) != null)
+                    errors.add(new PersonnelAccounts.Error(row, "number", "USERNAME_EXISTS", "账号已存在，不覆盖原账号"));
+                items.add(Map.of("row", row, "username", user.username(), "displayName", user.displayName(), "roles", user.roleCodes()));
+            }
+        }
+        return Map.of("total", command.rows().size(), "canImport", errors.isEmpty(), "items", items, "errors", errors);
+    }
+
+    /**
+     * 批量创建学生和教师：重新校验输入，在管理员守卫锁内复核唯一性并整批写入。
+     * 预览不是授权或唯一性承诺；确认时任一冲突会回滚整批，不能部分创建或重置旧密码。
+     * 幂等载荷使用密码 HMAC 指纹，记录及响应不含明文密码或 BCrypt 摘要。
+     */
+    public Mutation importPersonnel(AuthActor actor, String key, AuthCommands.PersonnelImport command) {
+        requireAdmin(actor);
+        var prepared = PersonnelAccounts.prepare(command);
+        if (!prepared.errors().isEmpty())
+            throw new BusinessException(422, "IMPORT_HAS_ERRORS", "人员资料存在错误，请先预览并修正");
+        var normalized = prepared.users().stream().map(user -> new AuthCommands.CreateUser(user.username(),
+                tokens.passwordFingerprint(user.initialPassword()), user.displayName(), user.roleCodes())).toList();
+        // 密码计算放在事务外，限制单批规模，避免长时间占用全局账号管理锁。
+        var encoded = prepared.users().stream().map(user -> passwords.encode(user.initialPassword())).toList();
+        return idempotent(actor, "IMPORT_PERSONNEL", key, normalized, () -> {
+            for (var user : prepared.users()) {
+                if (repo.username(user.username(), false) != null)
+                    throw new BusinessException(409, "USERNAME_EXISTS", "本批包含已存在账号，请重新预览；未创建任何账号");
+            }
+            var items = new ArrayList<Map<String, Object>>();
+            for (int index = 0; index < prepared.users().size(); index++) {
+                var user = prepared.users().get(index);
+                long id = repo.createUser(user.username(), encoded.get(index), user.displayName(), user.roleCodes());
+                repo.audit(Long.parseLong(actor.userId()), "IMPORT_PERSONNEL", id, null, "ACTIVE");
+                items.add(view(repo.user(id, false)));
+            }
+            return new Mutation(201, Map.of("created", items.size(), "items", items), false);
         });
     }
 

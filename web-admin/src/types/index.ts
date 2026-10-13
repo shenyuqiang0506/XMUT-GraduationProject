@@ -2,7 +2,7 @@
  * 与后端 JSON 响应对应的前端契约。
  * 数据库 ID 使用字符串，防止大整数精度丢失；可空来源字段保留 null，不用零或空字符串伪造事实。
  */
-export type Role = 'SYSTEM_ADMIN' | 'RESOURCE_ADMIN' | 'STUDENT'
+export type Role = 'SYSTEM_ADMIN' | 'RESOURCE_ADMIN' | 'STUDENT' | 'TEACHER'
 
 // 身份服务确认的操作者，包含设备会话标识和实时角色；不能由前端表单自行构造为可信身份。
 export interface Actor {

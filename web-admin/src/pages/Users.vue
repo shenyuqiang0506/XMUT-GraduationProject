@@ -3,7 +3,7 @@
  * 系统管理员账号管理页面：创建账号、调整角色、启用或停用。
  * 修改请求携带身份版本与幂等键；后端拒绝最后管理员被停用或降权。
  */
-import {ref, onMounted} from 'vue'
+import {ref, computed, onMounted} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
 import type {Page, User, Role} from '../types'
@@ -12,7 +12,11 @@ const rows = ref<User[]>([]), page = ref(1), total = ref(0), username = ref(''),
     dialog = ref(false), saving = ref(false), keys = mutationKeys(), roleDialog = ref(false),
     target = ref<User | null>(null), roles = ref<Role[]>([])
 const form = ref({username: '', displayName: '', initialPassword: '', roleCodes: ['STUDENT'] as Role[]}),
-    names: Record<Role, string> = {SYSTEM_ADMIN: '系统管理员', RESOURCE_ADMIN: '资源管理员', STUDENT: '学生'}
+    names: Record<Role, string> = {SYSTEM_ADMIN: '系统管理员', RESOURCE_ADMIN: '资源管理员', STUDENT: '学生', TEACHER: '教师'}
+
+// 学号与工号直接作为登录账号；编号使用文本输入，避免前导零被数字控件丢弃。
+const accountLabel = computed(() => form.value.roleCodes.includes('TEACHER') ? '工号'
+    : form.value.roleCodes.includes('STUDENT') ? '学号' : '账号')
 
 // 按当前页和账号筛选重新读取列表；失败保留错误提示，并在 finally 结束加载状态。
 async function load() {
@@ -100,7 +104,7 @@ async function changeStatus(row: User) {
 }
 </script>
 <template><h1>账号与权限</h1>
-  <p class="lead">创建本地账号，管理角色与启停状态。权限变更或停用会立即撤销原会话。</p>
+  <p class="lead">学生使用学号、教师使用工号登录；管理角色需单独授予。权限变更或停用会立即撤销原会话。</p>
   <div class="card">
     <div class="toolbar">
       <el-input v-model="username" placeholder="筛选账号" clearable/>
@@ -136,8 +140,8 @@ async function changeStatus(row: User) {
   </div>
   <el-dialog v-model="dialog" title="创建账号" width="500px" @closed="form.initialPassword=''">
     <el-form label-position="top" @submit.prevent="create">
-      <el-form-item label="账号">
-        <el-input v-model="form.username" maxlength="64" autocomplete="off"/>
+      <el-form-item :label="accountLabel">
+        <el-input v-model="form.username" maxlength="64" autocomplete="off" :placeholder="`请输入${accountLabel}，保留前导零`"/>
       </el-form-item>
       <el-form-item label="姓名">
         <el-input v-model="form.displayName" maxlength="100"/>

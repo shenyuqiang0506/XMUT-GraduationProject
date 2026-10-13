@@ -38,7 +38,7 @@ async function submit() {
       <p>统一管理场地与设备资料，保留每一份来源。<br>以明确的账号与授权，完成日常管理。</p></section>
     <section class="login-card">
       <el-form @submit.prevent="submit"><h1>登录工作台</h1>
-        <p class="lead">使用管理员分配的本地账号登录。</p>
+        <p class="lead">学生使用学号，教师使用工号；管理员使用分配的账号登录。</p>
         <el-form-item label="账号" label-position="top">
           <el-input v-model="username" name="username" autocomplete="username" maxlength="64"/>
         </el-form-item>

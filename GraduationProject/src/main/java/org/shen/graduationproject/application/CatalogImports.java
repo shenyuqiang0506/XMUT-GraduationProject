@@ -24,6 +24,7 @@ import tools.jackson.databind.ObjectMapper;
 @Profile("business")
 @RequiredArgsConstructor
 public class CatalogImports {
+    private final BookingWriteCoordinator coordinator;
     private final JdbcTemplate sql;
     private final CatalogAccess access;
     private final CatalogIdempotency idempotency;
@@ -180,6 +181,7 @@ public class CatalogImports {
                     throw new BusinessException(422, "IMPORT_HAS_ERRORS", "文件无法按已保存映射确认");
                 // 对已有资源按主键升序加锁，与其他资源写入保持一致，降低多资源交叉操作的死锁风险。
                 var ids = parsed.rows().stream().map(r -> catalog.find(r.resource().sourceSystem(), r.resource().sourceId(), r.resource().dataMode())).filter(Objects::nonNull).distinct().sorted().toList();
+                coordinator.resources(ids);
                 for (long resource : ids) catalog.raw(resource, true);
                 int inserted = 0, updated = 0;
                 for (var row : parsed.rows().stream().sorted(Comparator.comparing(r -> r.resource().sourceId())).toList()) {
@@ -215,6 +217,7 @@ public class CatalogImports {
                 var summary = new LinkedHashMap<String, Object>(preview);
                 summary.put("summary", Map.of("sourceRows", parsed.sourceRows(), "newRows", inserted, "updateRows", updated, "errorRows", 0));
                 summary.put("requiresConfirmation", false);
+                summary.put("affectedApplications",coordinator.changed(actor,ids));
                 sql.update("UPDATE import_batch SET status='COMMITTED',committed_at=UTC_TIMESTAMP(3),preview_result=? WHERE id=?", json.writeValueAsString(summary), id);
                 catalog.audit(actor, "IMPORT_COMMIT", "IMPORT_BATCH", id, "PREVIEWED", "COMMITTED");
                 return new CatalogIdempotency.Result(200, view(batch(actor, id, false)), false);

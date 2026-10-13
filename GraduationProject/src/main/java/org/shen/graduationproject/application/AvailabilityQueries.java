@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.*;
 /**
  * 在一致性快照中查询资源日历和场地、设备可行组合。
  * 开放规则、有效来源覆盖与已知占用共同决定状态；缺少占用记录不代表可用。
- * 当前仅计算外部占用，不创建暂占，也不替代未来申请提交时的加锁复核。
+ * 查询同时计算外部占用、有效暂占和批准占用；查询本身不创建暂占。
  */
 @Service
 @Profile("business")
@@ -58,16 +58,26 @@ public class AvailabilityQueries {
      * 批量读取所有候选在目标窗口相关的数据，SQL 使用半开区间重叠条件，端点相接不算占用。
      */
     private Snapshot load(List<Map<String, Object>> resources, TimeWindow window) {
+        return load(resources, window, null);
+    }
+
+    private Snapshot load(List<Map<String, Object>> resources, TimeWindow window, Long excludeApplication) {
         if (resources.isEmpty()) return new Snapshot(Map.of(), Map.of(), Map.of());
         Object[] ids = resources.stream().map(AvailabilityQueries::id).toArray();
         String in = placeholders(ids.length);
         var args = new ArrayList<>(Arrays.asList(ids));
         args.add(Timestamp.from(window.end()));
         args.add(Timestamp.from(window.start()));
-        // 批量读取三个维度，避免每个候选资源单独查询带来的 N+1 开销。
+        var occupancy = new ArrayList<>(sql.queryForList("SELECT resource_id,start_at,end_at,data_mode,'EXTERNAL' type FROM external_occupancy WHERE resource_id IN (" + in + ") AND active=1 AND start_at<? AND end_at>?", args.toArray()));
+        var platformArgs = new ArrayList<>(args);
+        if (excludeApplication != null) platformArgs.add(excludeApplication);
+        // 过期 HOLD 即使尚未被定时任务更新为 RELEASED，也不能继续阻挡可用组合。
+        occupancy.addAll(sql.queryForList("SELECT o.resource_id,o.start_at,o.end_at,a.data_mode,CASE WHEN a.status='CONFLICT_REVIEW' THEN 'CONFLICT_REVIEW' ELSE o.status END type FROM resource_occupancy o JOIN activity_application a ON a.id=o.application_id WHERE o.resource_id IN (" + in + ") AND o.start_at<? AND o.end_at>? AND (o.status='CONFIRMED' OR (o.status='HOLD' AND o.expires_at>UTC_TIMESTAMP(3)))"
+                + (excludeApplication == null ? "" : " AND o.application_id<>?"), platformArgs.toArray()));
+        // 批量读取规则、覆盖和两类占用，避免逐资源 N+1 查询。
         return new Snapshot(group(sql.queryForList("SELECT * FROM resource_opening_rule WHERE resource_id IN (" + in + ") AND enabled=1", ids)),
                 group(sql.queryForList("SELECT * FROM availability_coverage WHERE resource_id IN (" + in + ") AND active=1 AND from_at<? AND to_at>?", args.toArray())),
-                group(sql.queryForList("SELECT resource_id,start_at,end_at,data_mode FROM external_occupancy WHERE resource_id IN (" + in + ") AND active=1 AND start_at<? AND end_at>?", args.toArray())));
+                group(occupancy));
     }
 
     private static LocalDate date(Object value) {
@@ -162,7 +172,7 @@ public class AvailabilityQueries {
             if (!mode.equals(busy.get("data_mode"))) continue;
             Instant start = UtcTimes.instant(busy.get("start_at")), end = UtcTimes.instant(busy.get("end_at"));
             intervals.add(Map.of("startAt", TimeWindow.display(start.isBefore(window.start()) ? window.start() : start),
-                    "endAt", TimeWindow.display(end.isAfter(window.end()) ? window.end() : end), "type", "EXTERNAL"));
+                    "endAt", TimeWindow.display(end.isAfter(window.end()) ? window.end() : end), "type", busy.get("type")));
         }
         var evidence = new ArrayList<Map<String, Object>>();
         for (var proof : data.coverage().getOrDefault(resource, List.of())) {
@@ -180,6 +190,19 @@ public class AvailabilityQueries {
         return Map.of("resourceId", Long.toString(resource), "dataMode", mode, "from", TimeWindow.display(window.start()),
                 "to", TimeWindow.display(window.end()), "intervals", intervals, "coverageStatus", coverage(row, window, policy, now, data),
                 "openingRules", openingRules(resource), "checkedAt", TimeWindow.display(now), "coverageIntervals", evidence);
+    }
+
+    /**
+     * 写申请、批准和来源变更复用同一可用性判据。调用方必须先锁协调行及完整资源集合。
+     * excludeApplication 只排除正在审批/复核的本申请，不能排除其他用户的占用。
+     */
+    public List<Map<String, Object>> inspect(List<Long> ids, TimeWindow window, BookingPolicies.Active policy, Long excludeApplication) {
+        var rows = sql.queryForList("SELECT r.*,ag.status group_status,e.condition_status,e.equipment_type FROM resource r LEFT JOIN approval_group ag ON ag.id=r.approval_group_id LEFT JOIN equipment_detail e ON e.resource_id=r.id WHERE r.id IN (" + placeholders(ids.size()) + ") ORDER BY r.id", ids.toArray());
+        if (rows.size() != ids.size()) throw new BusinessException(404, "NOT_FOUND", "资源不存在或不可见");
+        var data = load(rows, window, excludeApplication);
+        Instant now = policies.now();
+        for (var row : rows) row.put("checked_availability", status(row, window, policy, now, data));
+        return rows;
     }
 
     /**

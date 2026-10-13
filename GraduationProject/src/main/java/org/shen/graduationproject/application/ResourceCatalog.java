@@ -26,6 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 @Profile("business")
 @RequiredArgsConstructor
 public class ResourceCatalog {
+    private final BookingWriteCoordinator coordinator;
     private final JdbcTemplate sql;
     private final CatalogAccess access;
     private final CatalogIdempotency idempotency;
@@ -200,6 +201,7 @@ public class ResourceCatalog {
         if (!allowed.containsAll(fields.keySet()) || !(fields.get("expectedVersion") instanceof Number))
             throw new BusinessException(400, "VALIDATION_ERROR", "更新字段或版本无效");
         return idempotency.execute(actor, "UPDATE_RESOURCE:" + id, key, fields, () -> {
+            coordinator.resources(List.of(id));
             var row = raw(id, true);
             access.manage(actor, id);
             Number expected = (Number) fields.get("expectedVersion");
@@ -226,6 +228,7 @@ public class ResourceCatalog {
             Map<String, Object> payload = row.get("raw_payload") == null ? Map.of() : json.readValue(row.get("raw_payload").toString(), Map.class);
             update(id, input, row.get("import_batch_id") == null ? null : ((Number) row.get("import_batch_id")).longValue(), payload);
             audit(actor, "UPDATE_RESOURCE", "RESOURCE", id, row.get("platform_status").toString(), input.platformStatus());
+            coordinator.changed(actor,List.of(id));
             return new CatalogIdempotency.Result(200, view(raw(id, false)), false);
         });
     }

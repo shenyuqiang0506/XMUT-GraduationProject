@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 @Profile("business")
 @RequiredArgsConstructor
 public class AvailabilityMaintenance {
+    private final BookingWriteCoordinator coordinator;
     private final JdbcTemplate sql;
     private final CatalogAccess access;
     private final CatalogIdempotency idempotency;
@@ -42,6 +43,7 @@ public class AvailabilityMaintenance {
                 throw new BusinessException(400, "TIME_RANGE_INVALID", "开放规则需要当天有效时段，日期不能倒置，时刻精度为秒");
         }
         return idempotency.execute(actor, "OPENING_RULES:" + resource, key, input, () -> {
+            coordinator.resources(java.util.List.of(resource));
             var current = catalog.raw(resource, true);
             access.manage(actor, resource);
             policies.mode(current.get("data_mode").toString());
@@ -54,6 +56,7 @@ public class AvailabilityMaintenance {
                         Date.valueOf(rule.validFrom()), Date.valueOf(rule.validTo()), rule.enabled() ? 1 : 0);
             sql.update("UPDATE resource SET version=version+1 WHERE id=?", resource);
             catalog.audit(actor, "OPENING_RULES", "RESOURCE", resource, null, null);
+            coordinator.changed(actor,java.util.List.of(resource));
             return new CatalogIdempotency.Result(200, Map.of("resourceId", Long.toString(resource), "version", input.expectedVersion() + 1,
                     "rules", queries.openingRules(resource)), false);
         });
@@ -78,6 +81,7 @@ public class AvailabilityMaintenance {
         window.limitDays(31);
         try {
             return idempotency.execute(actor, "EXTERNAL_CREATE:" + resource, key, input, () -> {
+                coordinator.resources(java.util.List.of(resource));
                 var row = catalog.raw(resource, true);
                 access.manage(actor, resource);
                 policies.mode(row.get("data_mode").toString());
@@ -86,6 +90,7 @@ public class AvailabilityMaintenance {
                         resource, input.sourceKey(), Timestamp.from(window.start()), Timestamp.from(window.end()), input.reasonCode(), input.sourceSystem(), row.get("data_mode"));
                 long id = sql.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
                 catalog.audit(actor, "EXTERNAL_CREATE", "RESOURCE", resource, null, "ACTIVE");
+                coordinator.changed(actor,java.util.List.of(resource));
                 return new CatalogIdempotency.Result(201, view(sql.queryForMap("SELECT * FROM external_occupancy WHERE id=?", id)), false);
             });
         } catch (DuplicateKeyException conflict) {
@@ -119,7 +124,8 @@ public class AvailabilityMaintenance {
         var window = TimeWindow.of(input.startAt(), input.endAt());
         window.limitDays(31);
         return idempotency.execute(actor, "EXTERNAL_UPDATE:" + id, key, input, () -> {
-            // 固定顺序：幂等记录 → 资源 → 占用。后续预约写入也遵守资源锁协议。
+            coordinator.resources(java.util.List.of(resource));
+            // 固定顺序：幂等记录 → 写协调行 → 全组升序资源 → 占用。后续预约写入也遵守资源锁协议。
             var owner = catalog.raw(resource, true);
             access.manage(actor, resource);
             policies.mode(owner.get("data_mode").toString());
@@ -129,6 +135,7 @@ public class AvailabilityMaintenance {
             sql.update("UPDATE external_occupancy SET start_at=?,end_at=?,reason_code=?,active=?,observed_at=UTC_TIMESTAMP(3),version=version+1 WHERE id=?",
                     Timestamp.from(window.start()), Timestamp.from(window.end()), input.reasonCode(), input.active() ? 1 : 0, id);
             catalog.audit(actor, "EXTERNAL_UPDATE", "RESOURCE", resource, null, input.active() ? "ACTIVE" : "INACTIVE");
+            coordinator.changed(actor,java.util.List.of(resource));
             return new CatalogIdempotency.Result(200, view(sql.queryForMap("SELECT * FROM external_occupancy WHERE id=?", id)), false);
         });
     }

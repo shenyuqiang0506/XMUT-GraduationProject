@@ -14,7 +14,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * 目录与可用性写操作共用的幂等事务边界。
+ * 目录、可用性与联合预约写操作共用的幂等事务边界。
  * 操作者、操作名和请求键共同标识请求；请求指纹不同会冲突，相同且成功则回放原响应。
  * 业务回调与成功响应一起写入事务，抛错时整体回滚，避免出现成功记录却缺少业务写入。
  */
@@ -28,6 +28,7 @@ public class CatalogIdempotency {
     private final JdbcTemplate sql;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
+    private final BookingWriteCoordinator coordinator;
 
     /**
      * 递归排序对象键，消除 JSON 字段顺序对指纹的影响；数组顺序保留，由用例决定是否另行规范化。
@@ -63,6 +64,7 @@ public class CatalogIdempotency {
                 throw new BusinessException(409, "IDEMPOTENCY_KEY_REUSED", "同一幂等键对应的请求内容不同");
             if ("SUCCEEDED".equals(row.get("status")))
                 return new Result(((Number) row.get("http_status")).intValue(), json.readValue(row.get("response_body").toString(), Object.class), true);
+            coordinator.lock();
             // 回调在当前数据库事务内运行；成功响应与业务数据一并持久化，重试无需重新执行写操作。
             Result result = work.get();
             sql.update("UPDATE idempotency_record SET status='SUCCEEDED',http_status=?,response_body=? WHERE id=?", result.status(), json.writeValueAsString(result.data()), row.get("id"));

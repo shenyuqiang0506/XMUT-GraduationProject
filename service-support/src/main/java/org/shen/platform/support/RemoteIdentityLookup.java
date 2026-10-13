@@ -1,15 +1,9 @@
 package org.shen.platform.support;
 
-import java.net.http.HttpClient;
-import java.time.Duration;
-
 import org.shen.platform.contracts.*;
-import org.slf4j.MDC;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
@@ -18,25 +12,16 @@ import org.springframework.web.client.RestClientResponseException;
  * 无实例或无效响应均拒绝本次业务调用，不能降级为默认放行。
  */
 public final class RemoteIdentityLookup implements IdentityLookup {
-    private final DiscoveryClient discovery;
-    private final RestClient http;
+    private final IdentityServiceClient http;
 
     public RemoteIdentityLookup(DiscoveryClient discovery) {
-        this.discovery = discovery;
-        var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
-        factory.setReadTimeout(Duration.ofSeconds(3));
-        this.http = RestClient.builder().requestFactory(factory).build();
+        this.http = new IdentityServiceClient(discovery);
     }
 
     public AuthActor resolve(Jwt jwt) {
-        var instances = discovery.getInstances("identity-service");
-        if (instances.isEmpty()) throw new BusinessException(503, "SERVICE_UNAVAILABLE", "身份服务暂不可用");
         try {
-            var response = http.get().uri(instances.getFirst().getUri() + "/internal/auth/session")
-                    .header("Authorization", "Bearer " + jwt.getTokenValue())
-                    .header(TraceIds.HEADER, TraceIds.acceptOrCreate(MDC.get(TraceIds.MDC_KEY)))
-                    .retrieve().body(new ParameterizedTypeReference<ApiResponse<AuthActor>>() {
-                    });
+            var response = http.get("/internal/auth/session", jwt.getTokenValue(),
+                    new ParameterizedTypeReference<ApiResponse<AuthActor>>() {});
             // 同时核对用户和会话标识，防止成功格式的错误响应被当作当前请求身份。
             if (response == null || !"OK".equals(response.code()) || response.data() == null
                     || !jwt.getSubject().equals(response.data().userId())

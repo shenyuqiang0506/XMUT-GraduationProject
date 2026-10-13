@@ -1,19 +1,15 @@
 package org.shen.graduationproject.infrastructure;
 
-import java.net.http.HttpClient;
-import java.time.Duration;
-import java.util.Map;
+import java.util.List;
 
 import org.shen.platform.contracts.*;
 import org.shen.platform.support.BusinessException;
-import org.slf4j.MDC;
+import org.shen.platform.support.IdentityServiceClient;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
@@ -24,30 +20,25 @@ import org.springframework.web.client.RestClientResponseException;
 @Component
 @Profile("business")
 public class AuthorizedUsers {
-    private final DiscoveryClient discovery;
-    private final RestClient http;
+    /** 只接收管理员资格校验所需字段，避免未检查的 Map/List 强制转换。 */
+    public record UserSummary(String userId, String status, List<String> roles) {}
+
+    private final IdentityServiceClient http;
 
     public AuthorizedUsers(DiscoveryClient discovery) {
-        this.discovery = discovery;
-        var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
-        factory.setReadTimeout(Duration.ofSeconds(3));
-        this.http = RestClient.builder().requestFactory(factory).build();
+        this.http = new IdentityServiceClient(discovery);
     }
 
     public void requireManager(String id) {
         CatalogAccess.id(id);
-        var instances = discovery.getInstances("identity-service");
-        if (instances.isEmpty()) throw new BusinessException(503, "SERVICE_UNAVAILABLE", "身份服务暂不可用");
         try {
-            var response = http.get().uri(instances.getFirst().getUri() + "/internal/auth/users/" + id)
-                    .header("Authorization", "Bearer " + SecurityContextHolder.getContext().getAuthentication().getCredentials())
-                    .header(TraceIds.HEADER, TraceIds.acceptOrCreate(MDC.get(TraceIds.MDC_KEY)))
-                    .retrieve().body(new ParameterizedTypeReference<ApiResponse<Map<String, Object>>>() {
-                    });
-            if (response == null || response.data() == null || !"OK".equals(response.code()))
+            var response = http.get("/internal/auth/users/" + id,
+                    SecurityContextHolder.getContext().getAuthentication().getCredentials().toString(),
+                    new ParameterizedTypeReference<ApiResponse<UserSummary>>() {});
+            if (response == null || response.data() == null || !"OK".equals(response.code()) || response.data().roles() == null)
                 throw new BusinessException(503, "SERVICE_UNAVAILABLE", "身份响应无效");
-            var roles = (java.util.List<?>) response.data().get("roles");
-            if (!id.equals(response.data().get("userId")) || !"ACTIVE".equals(response.data().get("status"))
+            var roles = response.data().roles();
+            if (!id.equals(response.data().userId()) || !"ACTIVE".equals(response.data().status())
                     || (!roles.contains("RESOURCE_ADMIN") && !roles.contains("SYSTEM_ADMIN")))
                 throw new BusinessException(422, "INVALID_MANAGER", "管理员必须是有效的资源管理员或系统管理员");
         } catch (RestClientResponseException failure) {

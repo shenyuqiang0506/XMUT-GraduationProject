@@ -27,6 +27,10 @@ import org.springframework.security.oauth2.server.resource.web.authentication.Be
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.client.RestClientException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.TransientDataAccessException;
 
 /**
  * MVC 业务服务的 JWT 认证与实时授权入口。
@@ -35,6 +39,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Configuration(proxyBeanMethods = false)
 @Profile("business")
+@Slf4j
 public class BusinessSecurity {
     @Bean
     JwtDecoder businessJwtDecoder(@Value("${JWT_PUBLIC_KEY_PATH}") String keyPath,
@@ -64,8 +69,13 @@ public class BusinessSecurity {
                     } catch (BusinessException failure) {
                         error(response, json, failure.status(), failure.code(), failure.getMessage());
                         return;
-                    } catch (RuntimeException unavailable) {
+                    } catch (RestClientException | DataAccessResourceFailureException | TransientDataAccessException unavailable) {
+                        log.warn("身份校验依赖不可用，traceId={}", MDC.get(TraceIds.MDC_KEY), unavailable);
                         error(response, json, 503, "SERVICE_UNAVAILABLE", "身份校验暂不可用");
+                        return;
+                    } catch (RuntimeException failure) {
+                        log.error("身份校验内部错误，traceId={}", MDC.get(TraceIds.MDC_KEY), failure);
+                        error(response, json, 500, "INTERNAL_ERROR", "服务内部错误，请联系管理员");
                         return;
                     }
                 }

@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-14",
+  "checks": [
+    {
+      "check": "AI 分库迁移、本人会话、学生教师角色、幂等创建和只读工具权限有效",
+      "result": "PASS"
+    },
+    {
+      "check": "含糊下午不填默认时刻；重复消息原结果回放、不重复调用模型或计费预算",
+      "result": "PASS"
+    },
+    {
+      "check": "多轮只改明确条件；真实组合和设备名称来自工具，UNKNOWN 场地不进入方案，AI 不写预约",
+      "result": "PASS"
+    },
+    {
+      "check": "资源 ID 注入、非法 JSON 与模型故障均降级，原条件保留，没有自动重试模型",
+      "result": "PASS"
+    },
+    {
+      "check": "模型超时有界；单会话并发拒绝、同消息在途不会重复调用，失败结果可回放",
+      "result": "PASS"
+    },
+    {
+      "check": "过期处理租约按请求恢复，检查点保留已确认条件，不重放可能已收费的模型调用",
+      "result": "PASS"
+    },
+    {
+      "check": "无匹配返回可见范围内的占用/覆盖原因类别，未知来源不会成为备选方案",
+      "result": "PASS"
+    },
+    {
+      "check": "AI 查询后新增占用仍阻止普通申请；资源恢复后整组提交并等待审批",
+      "result": "PASS"
+    },
+    {
+      "check": "跨会话按用户限制模型预算；额度耗尽后既有消息仍可回放",
+      "result": "PASS"
+    },
+    {
+      "check": "幂等旧方案沿用当前权限；不可见资源被隐藏，不能用 AI 对话绕过目录范围",
+      "result": "PASS"
+    },
+    {
+      "check": "只读工具轨迹与检查时间落库，关闭会话后不能发送新消息",
+      "result": "PASS"
+    }
+  ],
+  "realInfrastructure": true,
+  "model": "local OpenAI-compatible fault model",
+  "productionStarted": false,
+  "fixturesCleaned": true,
+  "testProcessesStopped": true,
+  "realDataModified": false,
+  "leaseRecovery": "simulated interrupted committed claim"
+}

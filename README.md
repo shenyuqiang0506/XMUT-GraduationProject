@@ -9,7 +9,7 @@
 - `GraduationProject/`：booking-service，保留原目录和制品名；正式资源目录、导入、可用性、联合申请与整组占用、审批、开放占用管理、审批组与管理范围。
 - `notification-service/`：独立通知库、消费去重、站内收件箱和死信恢复。
 - `identity-service/`：本地账号、BCrypt、JWT/刷新会话、角色与账号启停。
-- `ai-service/`：保留 Spring AI 依赖、模型配置和身份接入骨架；演示接口已移除，正式 AI 业务待实现。
+- `ai-service/`：本人智能查询会话、Spring AI 条件提取、受控只读工具、方案与故障降级。
 - `gateway/`：WebFlux 网关、JWT 校验和 Nacos/LoadBalancer 路由。
 - `common-contracts/`：统一响应、身份与 traceId 契约。
 - `security-core/`：共享 RSA 密钥读取与 JWT 校验，不向网关引入 MVC/JDBC。
@@ -62,7 +62,7 @@ python3 deployment/scripts/prepare-idea.py
 
 八个 Java 模块统一引入 Lombok（由 Boot 管理，当前 1.18.46）和 Hutool 全量包（5.8.47）。Lombok 使用 `provided` 范围并配置注解处理器，排除出可执行 JAR；Hutool 可直接使用 `cn.hutool.*`。IDEA 同步 Maven 后会导入依赖与处理器配置。纯依赖注入类使用 `@RequiredArgsConstructor`；包内构造器保留 `AccessLevel.PACKAGE`，依赖字段顺序保持原构造器参数顺序。带配置参数、校验或初始化逻辑的构造器仍显式编写，DTO 继续使用 `record`，Hutool 后续按需使用。
 
-普通 `verify` 执行 Java 单元及装配测试（本轮 60 项，涵盖基础装配、工具、时间边界、身份与网关规则），包含 Lombok 生成构造器/getter 与 Hutool 调用验证；H2 只能验证装配，不能证明 MySQL 事务与锁行为。真实基础服务验证使用 `deployment/scripts/verify-dev.sh`；正式身份、目录与 Web 使用下面的验收脚本。详细操作见 [部署说明](deployment/README.md)。
+普通 `verify` 执行 Java 单元及装配测试（当前 92 项，涵盖基础装配、工具、时间边界、身份、网关和 AI 条件），包含 Lombok 与 Hutool 验证；H2 不证明 MySQL 事务与锁行为。真实基础服务验证使用 `deployment/scripts/verify-dev.sh`，正式业务使用下面的验收脚本。详细操作见 [部署说明](deployment/README.md)。
 
 ## 本机运行
 
@@ -117,6 +117,13 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/waitlists-messaging-smoke.py
 
 ## 运行配置
 
+M5 已增加学生/教师“智能资源查询”：多轮追问、真实只读方案、普通申请确认与故障恢复。先执行 `prepare-ai.py dev`、`prepare-ai.py prod` 和 `prepare-idea.py`，prod 模型默认未启用。后端总启动已包含智能查询服务 8084；模型密钥只进入 AI 服务。说明与记录见 [M5 智能查询](开发文档/docs/development/22-M5智能查询.md)。
+
+```sh
+python3 deployment/scripts/ai-smoke.py
+XMUT_AI_REAL_TEST=1 python3 deployment/scripts/ai-smoke.py
+```
+
 本机 dev 优先使用 [部署说明](deployment/README.md) 和分服务私密环境文件。Spring Boot 不自动读取 `.env`；使用 `run-service.py` 加载对应配置，避免将身份私钥分发给网关或其他服务。
 
 端口：booking 8082、identity 8083、AI 8084、notification 8085、gateway 8081，默认回环地址。M2 Flyway 迁移分别位于身份服务与目录服务，分库账号只访问自己的库。
@@ -126,7 +133,7 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/waitlists-messaging-smoke.py
 - `dev` / `prod`：对应环境标记和 Nacos；Data ID 使用服务的 `spring.application.name`。
 - `business`：正式业务 API，加载对应环境的 JWT、数据库配置。
 - `bootstrap-admin`：仅 dev/test 身份服务初始化空库管理员，已有账号不覆盖；prod 禁止。
-- `ai`：仅在 ai-service 加载模型配置，需要私密 AI_BASE_URL、AI_MODEL、AI_API_KEY；当前没有对外 AI 查询接口。
+- `ai`：仅在 ai-service 加载模型配置，需要私密 AI_BASE_URL、AI_MODEL、AI_API_KEY；正式会话和只读工具由 `business` 提供。
 
 自动验证使用独立 Nacos 注册 group，完成后停止自己创建的 Java 进程，Docker dev 继续运行。Actuator 仅暴露 health/info。prod 已准备独立配置与凭据，尚未部署。
 
@@ -134,6 +141,7 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/waitlists-messaging-smoke.py
 
 ## 验证记录
 
+- [M5 智能查询](开发文档/docs/development/22-M5智能查询.md)
 - [M4 复审修复与回归](开发文档/docs/development/21-M4复审修复与回归.md)
 - [M4 候补与消息](开发文档/docs/development/20-M4候补与消息.md)
 - [M3 联合预约闭环](开发文档/docs/development/19-M3联合预约闭环.md)

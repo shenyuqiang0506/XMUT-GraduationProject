@@ -9,6 +9,7 @@ Web 管理端用于批量维护、审批和统计；iOS/Android 学生端用于�
 | 页面 | 内容和主要操作 | 对应接口 |
 | --- | --- | --- |
 | 登录与个人资料 | 登录、退出、当前角色 | auth、users/me |
+| 智能资源查询（学生/教师） | 本人会话、条件追问、可核查方案、普通申请确认 | ai/conversations、messages、applications |
 | 管理概览 | 待审批、冲突、到期、通知失败数量 | admin/applications、statistics |
 | 资源目录 | 分页筛选、新建、编辑、开放/停用、版本冲突提示 | resources、admin/resources |
 | 资源详情与日历 | 属性、设备、开放、外部占用、覆盖未知 | calendar、opening-rules、external-occupancies |
@@ -63,7 +64,7 @@ Web 管理端用于批量维护、审批和统计；iOS/Android 学生端用于�
 
 Web：pages、components、api、stores、types、utils、router。App 同样按页面、API、store、DTO 和平台能力隔离；uni-app 的页面路由与生命周期按其机制实现。
 
-请求层统一处理 baseUrl、Authorization、traceId、超时、业务错误、分页、幂等键。访问令牌过期时单次刷新，其余请求排队；刷新失败进入登录，避免循环刷新。
+请求层统一处理 baseUrl、Authorization、traceId、超时、业务错误、分页、幂等键。访问令牌过期时单次刷新，其余请求排队；凭据确认失效才进入登录，服务故障保留页面，不确定刷新结果暂停请求，详见复审修复记录。
 
 列表缓存按用户/角色/筛选分区；登出和角色变化清理相关状态。所有 ID 使用 string，时间展示采用业务时区。审批/状态操作发送 expectedVersion；冲突后重新加载，不在前端覆盖版本。
 

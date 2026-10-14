@@ -183,3 +183,7 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/waitlists-messaging-smoke.py
 ```
 
 验收会短暂暂停并恢复 dev RabbitMQ，须先停止其他业务进程；清理独立 DEMO 数据和队列，不删除数据卷。失败事件和死信需系统管理员检查原因后带说明重试。首版仅 IN_APP 站内通知，单节点 RabbitMQ 不具备多节点容错。完整参数、接口与边界见 [M4 文档](../开发文档/docs/development/20-M4候补与消息.md)。
+
+## M5 升级与智能查询服务
+
+M5 新增 AI 库和智能查询服务。执行 `prepare-ai.py dev`、`prepare-ai.py prod` 后再运行 `prepare-idea.py`。dev 沿用本地模型配置，prod 默认 disabled，不继承 dev API key；AI 环境文件只进入 AI 服务。总启动增加 8084，五个后端服务的实际配置已通过启动验证。迁移、默认预算及验证方法见 [M5 智能查询](../开发文档/docs/development/22-M5智能查询.md)。

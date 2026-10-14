@@ -1,0 +1,53 @@
+{
+  "date": "2026-10-14",
+  "baseCommit": "3585f72",
+  "javaModules": 8,
+  "javaCommand": "package",
+  "java": {
+    "tests": 92,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "frontendBuild": "passed",
+  "frontendTests": 27,
+  "frontendFailures": 0,
+  "mockBusinessChecks": 11,
+  "realModelBusinessChecks": 13,
+  "realModelSamples": 2,
+  "realModel": "deepseek-flash",
+  "modelAccuracyClaimed": false,
+  "ideaStartup": {
+    "actualSharedAndInnerConfigurationValidated": true,
+    "services": [
+      "identity-service",
+      "booking-service",
+      "notification-service",
+      "ai-service",
+      "gateway"
+    ],
+    "ports": [
+      8081,
+      8082,
+      8083,
+      8084,
+      8085
+    ],
+    "temporaryProcessesStopped": true
+  },
+  "isolationCheck": "passed",
+  "productionStarted": false,
+  "oldMigrationsModified": false,
+  "aiMigration": {
+    "version": 1,
+    "sha256": "5d80fd72f94c3fe48c40ccb981f01057ce6fb537ab9c43e4cd51157119d95f94",
+    "immutableAfterDevExecution": true,
+    "preMigrationBackupPrivate": true
+  },
+  "privateModelConfiguration": {
+    "mode": "600",
+    "recipientService": "ai-service",
+    "prodModelDisabled": true
+  },
+  "gatewayExistingUserChangesExcluded": true
+}

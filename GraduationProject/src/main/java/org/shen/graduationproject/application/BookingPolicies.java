@@ -12,8 +12,6 @@ import org.shen.graduationproject.infrastructure.*;
 import org.shen.platform.contracts.AuthActor;
 import org.shen.platform.support.BusinessException;
 import org.springframework.context.annotation.Profile;
-import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
@@ -33,7 +31,7 @@ public class BookingPolicies {
     private final ResourceCatalog catalog;
     private final ObjectMapper json;
     private final Validator validator;
-    private final Environment environment;
+    private final DataModes dataModes;
 
     public record Active(int version, PolicySettings settings) {
     }
@@ -42,10 +40,7 @@ public class BookingPolicies {
      * 校验数据模式并限制测试资料环境；部署环境 dev 与数据模式 REAL 是两个独立维度。
      */
     public void mode(String mode) {
-        if (!java.util.Set.of("REAL", "DEMO").contains(mode))
-            throw new BusinessException(400, "VALIDATION_ERROR", "需要明确指定 REAL 或 DEMO");
-        if ("DEMO".equals(mode) && !environment.acceptsProfiles(Profiles.of("dev", "test")))
-            throw new BusinessException(403, "FORBIDDEN", "演示数据仅允许在 dev/test 环境使用");
+        dataModes.check(mode);
     }
 
     /**

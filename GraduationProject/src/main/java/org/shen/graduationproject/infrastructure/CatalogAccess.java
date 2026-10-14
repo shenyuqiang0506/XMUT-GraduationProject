@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class CatalogAccess {
     private final JdbcTemplate sql;
+    private final DataModes dataModes;
 
     public static long id(String value) {
         try {
@@ -74,9 +75,11 @@ public class CatalogAccess {
      * 生成以 r 为资源表别名的可见性条件。唯一拼接值为已验真的用户 ID，经 long 解析后再拼接。
      */
     public String visibleSql(AuthActor actor) {
-        if (system(actor)) return "1=1";
+        // 没有模式筛选时也隔离 DEMO，不能依赖前端默认选择 REAL。
+        String mode = dataModes.demoAllowed() ? "1=1" : "r.data_mode='REAL'";
+        if (system(actor)) return mode;
         if (actor.roles().contains("RESOURCE_ADMIN"))
-            return "(EXISTS(SELECT 1 FROM resource_manager rm WHERE rm.resource_id=r.id AND rm.user_id=" + Long.parseLong(actor.userId()) + ") OR EXISTS(SELECT 1 FROM approval_group_member gm JOIN approval_group ag ON ag.id=gm.group_id WHERE gm.group_id=r.approval_group_id AND gm.user_id=" + Long.parseLong(actor.userId()) + " AND ag.status='ACTIVE'))";
-        return "r.platform_status='OPEN' AND EXISTS(SELECT 1 FROM approval_group ag WHERE ag.id=r.approval_group_id AND ag.status='ACTIVE')";
+            return mode + " AND (EXISTS(SELECT 1 FROM resource_manager rm WHERE rm.resource_id=r.id AND rm.user_id=" + Long.parseLong(actor.userId()) + ") OR EXISTS(SELECT 1 FROM approval_group_member gm JOIN approval_group ag ON ag.id=gm.group_id WHERE gm.group_id=r.approval_group_id AND gm.user_id=" + Long.parseLong(actor.userId()) + " AND ag.status='ACTIVE'))";
+        return mode + " AND r.platform_status='OPEN' AND EXISTS(SELECT 1 FROM approval_group ag WHERE ag.id=r.approval_group_id AND ag.status='ACTIVE')";
     }
 }

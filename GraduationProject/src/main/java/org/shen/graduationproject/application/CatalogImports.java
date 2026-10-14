@@ -33,6 +33,7 @@ public class CatalogImports {
     private final ResourceCatalog catalog;
     private final ObjectMapper json;
     private final TemporalImports temporal;
+    private final DataModes dataModes;
 
     private Map<String, Object> object(String text, int maximum) {
         try {
@@ -66,6 +67,7 @@ public class CatalogImports {
         var rows = sql.queryForList("SELECT * FROM import_batch WHERE id=?" + (lock ? " FOR UPDATE" : ""), id);
         if (rows.isEmpty() || (!access.system(actor) && !actor.userId().equals(rows.getFirst().get("operator_id").toString())))
             throw new BusinessException(404, "NOT_FOUND", "导入批次不存在或不可见");
+        dataModes.check(rows.getFirst().get("data_mode").toString());
         return rows.getFirst();
     }
 
@@ -109,6 +111,7 @@ public class CatalogImports {
         access.administrator(actor);
         if (!"RESOURCE_CATALOG".equals(type) || !source.matches("[A-Za-z0-9_-]{1,32}") || !Set.of("REAL", "DEMO").contains(mode))
             throw new BusinessException(400, "INVALID_IMPORT_TYPE", "当前阶段支持 RESOURCE_CATALOG，必须指定来源和 REAL/DEMO");
+        dataModes.check(mode);
         var map = object(mappingText, 10000);
         Map<String, String> override = new TreeMap<>();
         map.forEach((k, v) -> {
@@ -139,6 +142,7 @@ public class CatalogImports {
             Map<String, Object> result = Map.of("summary", summary, "fieldMapping", parsed.mapping(), "errors", errors, "requiresConfirmation", true);
             var payload = Map.of("fileHash", saved.hash(), "sourceSystem", source, "dataMode", mode, "importType", type, "mapping", override, "queryContext", context);
             var outcome = idempotency.execute(actor, "IMPORT_PREVIEW", key, payload, () -> {
+                dataModes.check(mode);
                 sql.update("INSERT INTO import_batch(source_system,import_type,data_mode,filename,file_storage_key,file_sha256,status,operator_id,field_mapping,preview_result,query_context) VALUES (?,?,?,?,?,?,'PREVIEWED',?,?,?,?)", source, type, mode, saved.filename(), saved.key(), saved.hash(), Long.parseLong(actor.userId()), json.writeValueAsString(parsed.mapping()), json.writeValueAsString(result), json.writeValueAsString(context));
                 long id = sql.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
                 for (var error : errors)

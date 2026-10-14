@@ -92,7 +92,10 @@ public class Waitlists {
             long gid=ensureGroup(ids,window,mode);expireGroup(gid,actor);
             if(sql.queryForObject("SELECT COUNT(*) FROM waitlist_entry WHERE group_id=? AND applicant_id=? AND status IN ('WAITING','OFFERED')",Long.class,gid,uid)>0)
                 throw new BusinessException(409,"DUPLICATE_WAITLIST","你已在同一组合和时段候补");
-            if(resources.stream().noneMatch(r -> "BUSY".equals(r.get("checked_availability"))))throw new BusinessException(409,"WAITLIST_NOT_NEEDED","资源已全部可用，请提交普通申请");
+            // 全空闲且没有既有队列才直接申请。队首暂时不能接收 offer 时，后来者仍可排在
+            // 同一固定组合之后；不能绕过 FIFO，也不能因 WAITLIST_PRIORITY 陷入无法入队的死路。
+            boolean queued=sql.queryForObject("SELECT COUNT(*) FROM waitlist_entry WHERE group_id=? AND ((status='WAITING' AND expires_at>UTC_TIMESTAMP(3)) OR (status='OFFERED' AND offer_expires_at>UTC_TIMESTAMP(3)))",Long.class,gid)>0;
+            if(!queued&&resources.stream().noneMatch(r -> "BUSY".equals(r.get("checked_availability"))))throw new BusinessException(409,"WAITLIST_NOT_NEEDED","资源已全部可用且没有候补队列，请提交普通申请");
             // 技术防滥用上限，不充当学校制度；WAITING 不占申请额度，不允许无限堆积请求。
             if(sql.queryForObject("SELECT COUNT(*) FROM waitlist_entry WHERE applicant_id=? AND status IN ('WAITING','OFFERED') AND expires_at>UTC_TIMESTAMP(3)",Long.class,uid)>=50)
                 throw new BusinessException(422,"WAITLIST_LIMIT_REACHED","有效候补过多，请先处理已有候补");

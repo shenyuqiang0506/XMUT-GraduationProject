@@ -74,9 +74,10 @@ public final class AvailabilityCommands {
     }
 
     /**
-     * 一种设备类型所需的单件设备数量；查询还会校验类型不重复及总件数上限。
+     * 类型沿用资源目录的原值（含中文名称），不擅自把真实来源标签映射为英文代码。
+     * 与目录一致限制为非空、最多 32 字符；查询还会校验类型不重复及总件数上限。
      */
-    public record EquipmentRequirement(@NotBlank @Pattern(regexp = "[A-Za-z0-9_-]{1,32}") String type,
+    public record EquipmentRequirement(@NotBlank @Size(max = 32) String type,
                                        @NotNull @Min(1) @Max(20) Integer count) {
     }
 

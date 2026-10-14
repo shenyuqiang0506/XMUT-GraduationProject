@@ -253,7 +253,10 @@ public class TemporalImports {
      */
     private void fragment(Map<String, Object> row, TimeWindow window) {
         String key = "__fragment_" + row.get("id") + "_" + ImportStorage.hash(window.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        sql.update("INSERT INTO external_occupancy(resource_id,source_system,source_key,start_at,end_at,reason_code,import_batch_id,observed_at,data_mode) VALUES (?,?,?,?,?,?,?,?,?)",
+        // 同一原记录重新启用后可能再次裁剪出同一片段。复用稳定来源身份，并恢复最新原记录
+        // 的元数据与 active；递增片段版本使持有旧版本的人工编辑被拒绝，观察时间不会续期。
+        sql.update("INSERT INTO external_occupancy(resource_id,source_system,source_key,start_at,end_at,reason_code,import_batch_id,observed_at,data_mode) VALUES (?,?,?,?,?,?,?,?,?) "
+                        + "ON DUPLICATE KEY UPDATE start_at=VALUES(start_at),end_at=VALUES(end_at),reason_code=VALUES(reason_code),import_batch_id=VALUES(import_batch_id),observed_at=VALUES(observed_at),active=1,version=version+1",
                 row.get("resource_id"), row.get("source_system"), key, Timestamp.from(window.start()), Timestamp.from(window.end()), row.get("reason_code"),
                 row.get("import_batch_id"), Timestamp.from(UtcTimes.instant(row.get("observed_at"))), row.get("data_mode"));
     }

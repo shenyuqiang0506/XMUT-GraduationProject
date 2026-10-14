@@ -34,6 +34,7 @@ public class ResourceCatalog {
     private final AuthorizedUsers users;
     private final ObjectMapper json;
     private final Validator validator;
+    private final DataModes dataModes;
 
     /**
      * 校验资源字段及跨字段约束：设备需要资产信息，开放资源需要有效审批组，真实来源必须明确可借。
@@ -41,6 +42,7 @@ public class ResourceCatalog {
     public void validate(CatalogCommands.Resource input) {
         if (!validator.validate(input).isEmpty())
             throw new BusinessException(400, "VALIDATION_ERROR", "资源字段不符合要求");
+        dataModes.check(input.dataMode());
         if ("EQUIPMENT".equals(input.resourceType()) && (input.assetCode() == null || input.assetCode().isBlank() || input.equipmentType() == null || input.equipmentType().isBlank()))
             throw new BusinessException(400, "VALIDATION_ERROR", "设备需要资产编号和设备类型");
         if (input.approvalGroupId() != null && sql.queryForObject("SELECT COUNT(*) FROM approval_group WHERE id=? AND status='ACTIVE'", Long.class, CatalogAccess.id(input.approvalGroupId())) == 0)
@@ -104,6 +106,7 @@ public class ResourceCatalog {
      * 先应用当前用户可见范围，再拼接白名单筛选列；筛选值通过 JDBC 参数绑定传入。
      */
     public Map<String, Object> list(AuthActor actor, int page, int size, Map<String, String> filters) {
+        if (!filters.getOrDefault("dataMode", "").isBlank()) dataModes.check(filters.get("dataMode"));
         if (page < 1 || page > 100000 || size < 1 || size > 100)
             throw new BusinessException(400, "VALIDATION_ERROR", "分页参数无效");
         StringBuilder where = new StringBuilder(" WHERE " + access.visibleSql(actor));

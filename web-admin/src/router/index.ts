@@ -15,13 +15,14 @@ import Approvals from '../pages/Approvals.vue'
 import Waitlists from '../pages/Waitlists.vue'
 import Notifications from '../pages/Notifications.vue'
 import EventDelivery from '../pages/EventDelivery.vue'
+import IntelligentQuery from '../pages/IntelligentQuery.vue'
 
 export const router = createRouter({
     history: createWebHistory(),
     routes: [{path: '/login', component: Login}, {path: '/', redirect: '/resources'}, {
         path: '/resources',
         component: Resources
-    }, {path: '/availability', component: Availability}, {path:'/applications',component:Applications},
+    }, {path: '/availability', component: Availability}, {path:'/ai',component:IntelligentQuery,meta:{applicant:true}}, {path:'/applications',component:Applications},
         {path:'/waitlists',component:Waitlists}, {path:'/notifications',component:Notifications},
         {path:'/event-delivery',component:EventDelivery,meta:{admin:true}},
         {path:'/approvals',component:Approvals,meta:{manager:true}}, {
@@ -40,4 +41,5 @@ router.beforeEach(to => {
     if (!s.signedIn && to.path != '/login') return '/login';
     if (s.signedIn && to.path === '/login') return '/resources';
     if ((to.meta.admin && !s.admin) || (to.meta.manager && !s.manager)) return '/resources'
+    if (to.meta.applicant && !s.applicant) return '/resources'
 })

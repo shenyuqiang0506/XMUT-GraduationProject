@@ -27,6 +27,7 @@ async function logout() {
       <el-menu router :default-active="$route.path">
         <el-menu-item index="/resources">资源目录</el-menu-item>
         <el-menu-item index="/availability">可用时段查询</el-menu-item>
+        <el-menu-item v-if="session.applicant" index="/ai">智能资源查询</el-menu-item>
         <el-menu-item index="/applications">我的申请</el-menu-item>
         <el-menu-item index="/waitlists">我的候补</el-menu-item>
         <el-menu-item index="/notifications">站内通知</el-menu-item>

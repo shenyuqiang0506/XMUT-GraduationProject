@@ -3,7 +3,7 @@ import {useSession} from '../stores/session'
 import {ApiError, fetchResponse, readResponse} from './http'
 export {ApiError} from './http'
 
-export async function api<T>(path: string, method = 'GET', body?: unknown, key?: string): Promise<T> {
+export async function api<T>(path: string, method = 'GET', body?: unknown, key?: string, timeoutMs = 15000): Promise<T> {
     const session = useSession(), sent = session.accessToken, version = session.sessionVersion
     if (session.refreshUncertain)
         throw new ApiError('刷新结果尚未确认，请保留编辑内容后重新登录', 401, 'REFRESH_UNCERTAIN')
@@ -11,7 +11,7 @@ export async function api<T>(path: string, method = 'GET', body?: unknown, key?:
     if (key) headers['Idempotency-Key'] = key
     if (body !== undefined && !(body instanceof FormData)) headers['Content-Type'] = 'application/json'
     const run = () => fetchResponse(path, {
-        method, headers,
+        method, headers, signal: AbortSignal.timeout(timeoutMs),
         body: body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body)
     })
     // 退出或切换账号后，旧请求不能用新账号的令牌重试，也不能清空新会话。

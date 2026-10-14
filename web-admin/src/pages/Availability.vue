@@ -6,7 +6,7 @@
 import {ref, onMounted} from 'vue'
 import {api, ApiError, explain, mutationKeys} from '../api/client'
 import {useSession} from '../stores/session'
-import {useRouter} from 'vue-router'
+import {useRouter, useRoute} from 'vue-router'
 import {ElMessage} from 'element-plus'
 import {usePagedOptions} from '../composables/usePagedOptions'
 import ShanghaiDateTime from '../components/ShanghaiDateTime.vue'
@@ -77,7 +77,25 @@ async function more() {
   await loadResources()
 }
 
-onMounted(loadResources)
+onMounted(() => {
+  // AI 降级只预填已确认条件，不自动查询或提交；URL 条件仍经本页与后端重复校验。
+  const route=useRoute()
+  if(typeof route.query.intent==='string'&&route.query.intent.length<10000) {
+    try {
+      const intent=JSON.parse(route.query.intent)
+      const wall=(value:unknown) => typeof value==='string'&&Number.isFinite(Date.parse(value))
+        ?new Date(Date.parse(value)+8*3600000).toISOString().slice(0,19).replace('T',' '):''
+      start.value=wall(intent.startAt);end.value=wall(intent.endAt)
+      if(typeof intent.participantCount==='number'&&Number.isInteger(intent.participantCount)&&intent.participantCount>0&&intent.participantCount<=100000)participants.value=intent.participantCount
+      if(typeof intent.campus==='string')campus.value=intent.campus
+      if(typeof intent.preferredBuilding==='string')building.value=intent.preferredBuilding
+      if(Array.isArray(intent.requiredFeatures)&&intent.requiredFeatures.every((f:unknown)=>typeof f==='string'&&featureOptions.some(o=>o.code===f)))features.value=intent.requiredFeatures
+      if(Array.isArray(intent.equipmentRequirements)&&intent.equipmentRequirements.length<=10&&intent.equipmentRequirements.every((n:{type?:unknown;count?:unknown})=>n&&typeof n.type==='string'&&typeof n.count==='number'&&Number.isInteger(n.count)&&n.count>=1&&n.count<=20))equipment.value=intent.equipmentRequirements
+      if(route.query.dataMode==='REAL'||route.query.dataMode==='DEMO')mode.value=route.query.dataMode
+    } catch {error.value='预填条件格式无效，请手动核对'}
+  }
+  loadResources()
+})
 
 // 清除旧结果再查询，避免失败后仍把上一次方案当作本次结果。当前页面最多展示返回的前 100 套组合。
 async function search() {

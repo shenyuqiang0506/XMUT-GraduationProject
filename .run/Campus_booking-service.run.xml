@@ -2,8 +2,8 @@
   <configuration default="false" name="预约服务（dev）" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
     <module name="GraduationProject" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="org.shen.graduationproject.GraduationProjectApplication" />
-    <option name="VM_PARAMETERS" value="-Dspring.config.additional-location=&quot;file:$PROJECT_DIR$/deployment/secrets/dev/idea/booking-service.properties&quot;" />
-    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="VM_PARAMETERS" value="-Dspring.config.additional-location=&quot;file:../deployment/secrets/dev/idea/booking-service.properties&quot;" />
+    <option name="WORKING_DIRECTORY" value="$MODULE_WORKING_DIR$" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

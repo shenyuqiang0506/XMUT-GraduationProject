@@ -35,15 +35,18 @@ def escape(value):
         else:out.append(c)
     return ''.join(out)
 
-# IDEA 运行配置只引用私密 properties 的路径，不把密码嵌入共享 XML。
-def config(service,module,main,name,prefix):
+# IDEA 项目根可能是仓库，也可能是内层 GraduationProject，不能据此推算凭据路径。
+# 四个 Maven 服务的内容根均直接位于仓库下，固定从模块目录回到 deployment。
+# MODULE_WORKING_DIR 只用于 IDEA 支持的工作目录字段；JVM 参数使用普通相对文件路径。
+# 运行配置只引用私密 properties 的路径，不把密码嵌入共享 XML。
+def config(service,module,main,name):
     root=ET.Element('component',name='ProjectRunConfigurationManager')
     conf=ET.SubElement(root,'configuration',default='false',name=name,type='SpringBootApplicationConfigurationType',factoryName='Spring Boot')
     ET.SubElement(conf,'module',name=module)
     ET.SubElement(conf,'option',name='SPRING_BOOT_MAIN_CLASS',value=main)
-    vm='-Dspring.config.additional-location="file:'+prefix+'/deployment/secrets/dev/idea/'+service+'.properties"'
+    vm='-Dspring.config.additional-location="file:../deployment/secrets/dev/idea/'+service+'.properties"'
     ET.SubElement(conf,'option',name='VM_PARAMETERS',value=vm)
-    ET.SubElement(conf,'option',name='WORKING_DIRECTORY',value=prefix)
+    ET.SubElement(conf,'option',name='WORKING_DIRECTORY',value='$MODULE_WORKING_DIR$')
     method=ET.SubElement(conf,'method',v='2');ET.SubElement(method,'option',name='Make',enabled='true')
     return root
 
@@ -78,14 +81,16 @@ def main():
             stream.write('# PRIVATE: generated from dev env files; never commit.\n')
             for key,value in values.items():stream.write(key+'='+escape(value)+'\n')
     shared=REPO/'.run';shared.mkdir(exist_ok=True)
-    write_xml(shared/'Campus_notification-service.run.xml',config('notification-service','notification-service','org.shen.notification.NotificationApplication','通知服务（dev）','$PROJECT_DIR$'))
+    # 全部服务共用同一生成逻辑，防止只有新增服务修正而旧身份/预约配置仍保留错误路径。
+    for service,module,main_class,name,_ in SERVICES:
+        write_xml(shared/('Campus_'+service+'.run.xml'),config(service,module,main_class,name))
     write_xml(shared/'Campus_Backend_dev.run.xml',compound())
     # The user's existing IDEA project lives in the inner directory. Keep its local configs ignored.
     inner=REPO/'GraduationProject/.idea'
     if (inner/'workspace.xml').exists():
         directory=inner/'runConfigurations';directory.mkdir(exist_ok=True)
         for service,module,main_class,name,_ in SERVICES:
-            write_xml(directory/('Campus_'+service.replace('-','_')+'.xml'),config(service,module,main_class,name,'$PROJECT_DIR$/..'))
+            write_xml(directory/('Campus_'+service.replace('-','_')+'.xml'),config(service,module,main_class,name))
         write_xml(directory/'Campus_Backend_dev.xml',compound())
     print('Prepared dev IDEA configuration: private files mode 600, no credentials printed. Select 后端总启动（dev） in IDEA.')
 

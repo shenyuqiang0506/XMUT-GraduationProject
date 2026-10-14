@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-14",
+  "result": "PASS",
+  "issue": "IDEA 打开内层 GraduationProject 时，PROJECT_DIR 拼接 deployment 形成重复目录，身份和预约服务无法读取配置",
+  "fix": {
+    "workingDirectory": "$MODULE_WORKING_DIR$",
+    "vmConfigLocation": "file:../deployment/secrets/dev/idea/<service>.properties",
+    "sharedAndInnerConfigurationsRegenerated": true,
+    "privateCredentialsChanged": false,
+    "prodStarted": false
+  },
+  "checks": {
+    "javaBuildAndTests": {
+      "tests": 60,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "sharedXmlOuterAndInnerProjectPathsMatch": true,
+    "localInnerXmlMatchesShared": true,
+    "oldDuplicatedPathRejected": true,
+    "allFourServicesReady": true,
+    "gatewayUnauthenticatedRequestRejected": true,
+    "temporaryProcessesStopped": true,
+    "portsReleased": [
+      8081,
+      8082,
+      8083,
+      8085
+    ]
+  },
+  "scope": "解析实际 XML 并使用其 JVM 参数和模块工作目录执行真实 JAR 等效启动；未操作 IDEA UI 或改动业务迁移",
+  "uploadedLogDiagnosis": {
+    "bookingAndIdentity": "配置文件路径重复，启动退出码 1",
+    "ai": "Started AiApplication 后收到 SIGINT，退出码 130；当次为 default profile"
+  }
+}

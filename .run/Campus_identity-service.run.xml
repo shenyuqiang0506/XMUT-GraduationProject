@@ -2,8 +2,8 @@
   <configuration default="false" name="身份服务（dev）" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
     <module name="identity-service" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="org.shen.identity.IdentityApplication" />
-    <option name="VM_PARAMETERS" value="-Dspring.config.additional-location=&quot;file:$PROJECT_DIR$/deployment/secrets/dev/idea/identity-service.properties&quot;" />
-    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="VM_PARAMETERS" value="-Dspring.config.additional-location=&quot;file:../deployment/secrets/dev/idea/identity-service.properties&quot;" />
+    <option name="WORKING_DIRECTORY" value="$MODULE_WORKING_DIR$" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

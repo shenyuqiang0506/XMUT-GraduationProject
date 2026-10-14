@@ -42,9 +42,11 @@ python3 deployment/scripts/prepare-idea.py
 
 凭据变更后重新执行准备脚本；已有内层 IDEA 工程会生成对应的本机运行配置。总启动包含四个后端服务，Web 仍在 `web-admin` 执行 `npm run dev`。停止时需停止四项后端进程，Docker 独立运行。
 
+共享配置以 `$MODULE_WORKING_DIR$` 作为工作目录，从服务模块通过 `file:../deployment/secrets/dev/idea/<服务名>.properties` 加载私密配置。因此打开仓库或内层 `GraduationProject` 工程时都指向同一份文件。若旧配置报错路径含 `GraduationProject/GraduationProject/deployment`，重新执行 `prepare-idea.py` 并重新打开运行配置；不要添加 `optional:` 跳过必须的数据库与身份配置。`verify-idea.py` 会读取实际 XML 校验两种工程上下文并启动验证。
+
 已执行的 Flyway `V*.sql` 必须保持原始内容，包括排版；表结构变更应新增版本迁移。否则格式化也可能导致启动时 checksum mismatch。
 
-本机验证已覆盖配置文件独立加载和 IDEA 总启动四服务就绪，见 [IDEA 启动验证记录](开发文档/docs/verification/2026-10-13/business/messages-build.json)。
+本机验证已覆盖配置文件独立加载和 IDEA 总启动四服务就绪，见 [M4 验证记录](开发文档/docs/verification/2026-10-13/business/messages-build.json)及 [2026-10-14 内外层工程路径修复验证](开发文档/docs/verification/2026-10-14/business/idea-path-fix.json)。
 
 ## 构建与验证
 

@@ -3,7 +3,7 @@
  * 资源目录列表、详情、编辑及审批组配置页面。
  * 来源可借用与平台开放分别显示；没有具体时间窗口时，目录状态不能证明资源可预约。
  */
-import {ref, onMounted} from 'vue'
+import {ref, onMounted, onBeforeUnmount} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
 import {stringObject} from '../utils/forms'
@@ -44,19 +44,24 @@ const form = ref(blank()), featureText = ref('{}')
 const states: Record<string, string> = {DRAFT: '草稿', OPEN: '已开放', CLOSED: '已关闭', RETIRED: '已退役'},
     borrow: Record<string, string> = {YES: '来源可借', NO: '来源不可借', UNKNOWN: '来源未确认'}
 
-// 查询参数通过 URLSearchParams 编码；服务端返回的资源已按当前身份过滤范围。
+// 请求编号区分 A→B→A 的连续查询；仅比较筛选值无法识别第一次 A 的迟到响应。
+let listRequest = 0
+onBeforeUnmount(() => { listRequest++ })
+// 查询参数在发送前固定，只有最后发起的请求可以更新列表、错误和加载状态。
 async function load() {
+  const request = ++listRequest
   busy.value = true;
   error.value = '';
   try {
     const q = new URLSearchParams({page: String(page.value), size: '20', ...filters.value});
     const data = await api<Page<Resource>>('/resources?' + q);
+    if (request !== listRequest) return
     rows.value = data.items;
     total.value = data.total
   } catch (e) {
-    error.value = explain(e)
+    if (request === listRequest) error.value = explain(e)
   } finally {
-    busy.value = false
+    if (request === listRequest) busy.value = false
   }
 }
 

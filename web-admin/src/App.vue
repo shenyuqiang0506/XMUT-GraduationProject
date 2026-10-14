@@ -45,6 +45,8 @@ async function logout() {
         </div>
       </header>
       <main>
+        <el-alert v-if="session.refreshUncertain" type="warning" :closable="false"
+                  title="刷新结果尚未确认，已暂停新请求。当前编辑内容已保留，请保留内容后重新登录。"/>
         <router-view/>
       </main>
     </section>

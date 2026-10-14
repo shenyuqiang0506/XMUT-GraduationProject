@@ -5,6 +5,8 @@ export {ApiError} from './http'
 
 export async function api<T>(path: string, method = 'GET', body?: unknown, key?: string): Promise<T> {
     const session = useSession(), sent = session.accessToken, version = session.sessionVersion
+    if (session.refreshUncertain)
+        throw new ApiError('刷新结果尚未确认，请保留编辑内容后重新登录', 401, 'REFRESH_UNCERTAIN')
     const headers: Record<string, string> = {'X-Trace-Id': crypto.randomUUID(), Authorization: 'Bearer ' + sent}
     if (key) headers['Idempotency-Key'] = key
     if (body !== undefined && !(body instanceof FormData)) headers['Content-Type'] = 'application/json'

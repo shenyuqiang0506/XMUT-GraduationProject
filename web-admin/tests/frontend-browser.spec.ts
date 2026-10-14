@@ -150,7 +150,14 @@ test('刷新服务故障保持 503 类型，旧请求不会把服务故障改成
         catch (e) { const failure = e as {status: number; code: string}; return {status: failure.status, code: failure.code} }
     })
     expect(error).toEqual({status: 503, code: 'SERVICE_UNAVAILABLE'})
-    await expect(page).toHaveURL(/\/login$/)
+    await expect(page).toHaveURL(/\/resources$/)
+    await expect(page.getByRole('alert').filter({hasText: '刷新结果尚未确认'})).toBeVisible()
+    // 未知 503 不能再次使用一次性刷新令牌；保留界面但暂停新请求。
+    const next = await page.evaluate(async () => {
+        const path = '/src/api/client.ts', client = await import(path)
+        try { await client.api('/resources') } catch (e) { return (e as {code: string}).code }
+    })
+    expect(next).toBe('REFRESH_UNCERTAIN')
 })
 
 test('退出后迟到的刷新响应不能恢复旧会话', async ({page}) => {
@@ -213,6 +220,150 @@ test('并发 401 共用一次刷新，并复用原幂等键及更新后的令牌
     expect(replayed.map(row => row.key).sort()).toEqual(['retry-key-a', 'retry-key-b'])
     expect(replayed.every(row => row.authorization === 'Bearer test-renewed')).toBe(true)
 })
+
+for (const returnToA of [false, true]) {
+    test('规则切换 ' + (returnToA ? 'A→B→A' : 'A→B') + ' 丢弃迟到响应，保存只使用当前资源版本', async ({page}) => {
+        let first = true, release!: () => void
+        const saved: {id: string; payload: Record<string, unknown>}[] = []
+        await install(page, async route => {
+            const url = new URL(route.request().url()), path = url.pathname
+            if (path === '/api/v1/resources') {
+                await json(route, ok({items: [resource(1), resource(2)], total: 2})); return true
+            }
+            const detail = path.match(/^\/api\/v1\/resources\/([12])$/)
+            if (detail) {
+                const old = detail[1] === '1' && first
+                if (old) { first = false; await new Promise<void>(resolve => { release = resolve }) }
+                await json(route, ok({...resource(Number(detail[1])), name: (old ? '迟到旧资源' : '当前资源') + detail[1], version: old ? 1 : 7, openingRules: []})); return true
+            }
+            if (path.endsWith('/external-occupancies')) {
+                await json(route, ok({items: [], total: 0})); return true
+            }
+            const write = path.match(/^\/api\/v1\/admin\/resources\/([12])\/opening-rules$/)
+            if (write) { saved.push({id: write[1]!, payload: route.request().postDataJSON()}); await json(route, ok({})); return true }
+            return false
+        })
+        await login(page)
+        await page.getByRole('menuitem', {name: '开放与占用管理', exact: true}).click()
+        const choose = async (id: number) => {
+            await page.getByLabel('选择资源', {exact: true}).click()
+            await page.getByRole('option', {name: '测试场地' + id + ' · REAL', exact: true}).click()
+        }
+        await choose(1)
+        await expect.poll(() => !!release).toBe(true)
+        await expect(page.getByRole('button', {name: '保存开放规则'})).toHaveCount(0)
+        await choose(2)
+        await expect(page.getByRole('heading', {name: '开放规则 · 当前资源2 · 版本 7'})).toBeVisible()
+        if (returnToA) {
+            await choose(1)
+            await expect(page.getByRole('heading', {name: '开放规则 · 当前资源1 · 版本 7'})).toBeVisible()
+        }
+        const oldResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/resources/1')
+        release()
+        // 等待旧请求确实完成再检查，避免仅在它尚未返回时得到“通过”。
+        await (await oldResponse).finished()
+        await page.evaluate(() => new Promise(requestAnimationFrame))
+        const selected = returnToA ? '1' : '2'
+        await expect(page.getByRole('heading', {name: '开放规则 · 当前资源' + selected + ' · 版本 7'})).toBeVisible()
+        await page.getByRole('button', {name: '保存开放规则', exact: true}).click()
+        await expect.poll(() => saved.length).toBe(1)
+        expect(saved[0]).toEqual({id: selected, payload: {expectedVersion: 7, rules: []}})
+        await expect(page.getByText('迟到旧资源1', {exact: false})).toHaveCount(0)
+    })
+}
+
+for (const users of [false, true]) {
+    test((users ? '账号' : '目录') + ' A→B→A 查询只接收最后结果，迟到错误不取消当前加载', async ({page}) => {
+        const waiting: (() => void)[] = [], received: string[] = []
+        let oldDone = false
+        await install(page, async route => {
+            const url = new URL(route.request().url())
+            if (url.pathname !== (users ? '/api/v1/users' : '/api/v1/resources')) return false
+            const filter = url.searchParams.get(users ? 'username' : 'campus')
+            if (!filter) { await json(route, ok({items: [], total: 0})); return true }
+            const index = received.length; received.push(filter)
+            await new Promise<void>(resolve => { waiting[index] = resolve })
+            if (index === 0) { await json(route, {code: 'SERVICE_UNAVAILABLE', message: '过期查询故障'}, 503); oldDone = true }
+            else {
+                const row = users ? {id: String(index), username: filter + index, displayName: filter + index, roles: ['STUDENT'], status: 'ACTIVE', authVersion: 0}
+                    : {...resource(index), name: filter + index}
+                await json(route, ok({items: [row], total: 1}))
+            }
+            return true
+        })
+        await login(page)
+        if (users) await page.getByRole('menuitem', {name: '账号与权限', exact: true}).click()
+        for (const value of ['A', 'B', 'A']) {
+            await page.getByPlaceholder(users ? '筛选账号' : '校区', {exact: true}).fill(value)
+            await page.getByRole('button', {name: '查询', exact: true}).click()
+            await expect.poll(() => waiting.length).toBe(received.length)
+        }
+        expect(received).toEqual(['A', 'B', 'A'])
+        waiting[0]!()
+        await expect.poll(() => oldDone).toBe(true)
+        await expect(page.locator('.el-table .el-loading-mask:not(.el-loading-fade-leave-active)')).toBeVisible()
+        await expect(page.getByRole('alert').filter({hasText: '过期查询故障'})).toHaveCount(0)
+        waiting[2]!()
+        await expect(page.getByRole('cell').filter({hasText: 'A2'}).first()).toBeVisible()
+        const oldResponse = page.waitForResponse(response => new URL(response.url()).searchParams.get(users ? 'username' : 'campus') === 'B')
+        waiting[1]!()
+        await (await oldResponse).finished()
+        await page.evaluate(() => new Promise(requestAnimationFrame))
+        await expect(page.getByRole('cell').filter({hasText: 'B1'})).toHaveCount(0)
+        await expect(page.getByRole('cell').filter({hasText: 'A2'}).first()).toBeVisible()
+    })
+}
+
+test('明确未执行的刷新故障保留表单，恢复后使用原刷新凭据安全重试', async ({page}) => {
+    let attempts = 0
+    await install(page, async route => {
+        if (new URL(route.request().url()).pathname !== '/api/v1/auth/refresh') return false
+        attempts++
+        if (attempts === 1) await json(route, {code: 'REFRESH_NOT_EXECUTED', message: '刷新尚未执行'}, 503)
+        else await json(route, ok({...tokens, accessToken: 'recovered-access'}))
+        return true
+    })
+    await login(page)
+    await page.getByRole('button', {name: '新增资源', exact: true}).click()
+    await page.getByRole('dialog').getByLabel('资源名称', {exact: true}).fill('未保存的真实资料')
+    const run = () => page.evaluate(async () => {
+        const path = '/src/stores/session.ts', session = (await import(path)).useSession()
+        try { await session.refresh(session.accessToken); return session.accessToken }
+        catch (e) { return (e as {code: string}).code }
+    })
+    expect(await run()).toBe('REFRESH_NOT_EXECUTED')
+    await expect(page.getByRole('dialog').getByLabel('资源名称', {exact: true})).toHaveValue('未保存的真实资料')
+    expect(await run()).toBe('recovered-access')
+    expect(attempts).toBe(2)
+    await expect(page).toHaveURL(/\/resources$/)
+})
+
+for (const revoked of [false, true]) {
+    test(revoked ? '刷新凭据被撤销立即退出' : '刷新响应丢失保留表单并禁止重放凭据', async ({page}) => {
+        let attempts = 0
+        await install(page, async route => {
+            if (new URL(route.request().url()).pathname !== '/api/v1/auth/refresh') return false
+            attempts++
+            if (revoked) await json(route, {code: 'SESSION_REVOKED', message: '登录状态已失效'}, 401)
+            else await route.abort('failed')
+            return true
+        })
+        await login(page)
+        await page.getByRole('button', {name: '新增资源', exact: true}).click()
+        await page.getByRole('dialog').getByLabel('资源名称', {exact: true}).fill('暂存内容')
+        const refresh = () => page.evaluate(async () => {
+            const path = '/src/stores/session.ts', session = (await import(path)).useSession()
+            try { await session.refresh(session.accessToken) } catch (e) { return (e as {code: string}).code }
+        })
+        expect(await refresh()).toBe(revoked ? 'SESSION_REVOKED' : 'NETWORK_ERROR')
+        if (revoked) await expect(page).toHaveURL(/\/login$/)
+        else {
+            await expect(page.getByRole('dialog').getByLabel('资源名称', {exact: true})).toHaveValue('暂存内容')
+            expect(await refresh()).toBe('REFRESH_UNCERTAIN')
+            expect(attempts).toBe(1)
+        }
+    })
+}
 
 test('资源提交断网后重试保持原幂等键，成功后关闭表单', async ({page}) => {
     const keys: string[] = []

@@ -3,7 +3,7 @@
  * 系统管理员账号管理页面：创建账号、调整角色、启用或停用。
  * 修改请求携带身份版本与幂等键；后端拒绝最后管理员被停用或降权。
  */
-import {ref, computed, onMounted} from 'vue'
+import {ref, computed, onMounted, onBeforeUnmount} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
 import type {Page, User, Role} from '../types'
@@ -18,8 +18,11 @@ const form = ref({username: '', displayName: '', initialPassword: '', roleCodes:
 const accountLabel = computed(() => form.value.roleCodes.includes('TEACHER') ? '工号'
     : form.value.roleCodes.includes('STUDENT') ? '学号' : '账号')
 
-// 按当前页和账号筛选重新读取列表；失败保留错误提示，并在 finally 结束加载状态。
+// 每次查询都有独立编号；旧请求不能覆盖新筛选，也不能提前撤销新请求的加载遮罩。
+let listRequest = 0
+onBeforeUnmount(() => { listRequest++ })
 async function load() {
+  const request = ++listRequest
   busy.value = true;
   error.value = '';
   try {
@@ -28,12 +31,13 @@ async function load() {
       size: '20',
       username: username.value
     }));
+    if (request !== listRequest) return
     rows.value = data.items;
     total.value = data.total
   } catch (e) {
-    error.value = explain(e)
+    if (request === listRequest) error.value = explain(e)
   } finally {
-    busy.value = false
+    if (request === listRequest) busy.value = false
   }
 }
 

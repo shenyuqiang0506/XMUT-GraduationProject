@@ -10,6 +10,8 @@ import {ApiError, fetchResponse, readResponse} from '../api/http'
 
 export const useSession = defineStore('session', () => {
     const accessToken = ref(''), refreshToken = ref(''), actor = ref<Actor | null>(null), sessionVersion = ref(0)
+    // 一次性刷新可能已提交但响应丢失，此时保留编辑界面，却禁止再次使用同一刷新令牌。
+    const refreshUncertain = ref(false)
     // 保存正在进行的刷新 Promise；其他并发请求直接等待同一结果。
     let flight: Promise<void> | null = null
     const deviceId = localStorage.getItem('xmut-device') || crypto.randomUUID()
@@ -27,12 +29,14 @@ export const useSession = defineStore('session', () => {
         accessToken.value = '';
         refreshToken.value = '';
         actor.value = null
+        refreshUncertain.value = false
     }
 
     // 每次刷新都会轮换 refreshToken，访问与刷新凭据须一起更新。
     function accept(data: Tokens) {
         accessToken.value = data.accessToken;
         refreshToken.value = data.refreshToken
+        refreshUncertain.value = false
     }
 
     // 登录和刷新不依赖已有访问令牌，因此独立发送请求，避免使用业务 api 导致递归刷新。
@@ -74,6 +78,8 @@ export const useSession = defineStore('session', () => {
 
     // sent 是失败请求实际发送的旧令牌。若页面令牌已更新，说明别的请求已完成刷新，直接复用即可。
     async function refresh(sent: string) {
+        if (refreshUncertain.value)
+            throw new ApiError('刷新结果尚未确认，请保留编辑内容后重新登录', 401, 'REFRESH_UNCERTAIN')
         if (accessToken.value && sent !== accessToken.value) return
         if (flight) return flight
         if (!refreshToken.value) {
@@ -88,7 +94,13 @@ export const useSession = defineStore('session', () => {
                     throw new ApiError('登录身份已改变，请重新操作', 401, 'SESSION_CHANGED')
                 accept(tokens)
             } catch (e) {
-                if (version === sessionVersion.value) clear()
+                if (version === sessionVersion.value) {
+                    if (e instanceof ApiError && [401, 403].includes(e.status)) clear()
+                    // 只有服务明确保证尚未执行轮换，才允许稍后重试；普通 503、超时和坏响应
+                    // 都可能发生在提交之后。保留界面及错误类型，并暂停后续请求，避免重放撤销会话。
+                    else if (!(e instanceof ApiError && e.status === 503 && e.code === 'REFRESH_NOT_EXECUTED'))
+                        refreshUncertain.value = true
+                }
                 throw e
             } finally {
                 // 旧刷新结束时不能清掉另一身份正在进行的刷新任务。
@@ -114,5 +126,5 @@ export const useSession = defineStore('session', () => {
         }
     }
 
-    return {accessToken, sessionVersion, actor, signedIn, manager, admin, applicant, login, refresh, logout, clear}
+    return {accessToken, sessionVersion, actor, signedIn, refreshUncertain, manager, admin, applicant, login, refresh, logout, clear}
 })

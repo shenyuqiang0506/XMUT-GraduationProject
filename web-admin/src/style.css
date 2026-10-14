@@ -20,6 +20,9 @@ button, input {
 
 aside {
     position: fixed;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
     width: 228px;
     height: 100vh;
     background: white;
@@ -53,7 +56,8 @@ aside {
 
 .el-menu {
     border: 0 !important;
-    margin-top: 32px
+    margin-top: 32px;
+    flex-shrink: 0
 }
 
 .el-menu-item {
@@ -66,8 +70,10 @@ aside {
 }
 
 .stage {
-    position: absolute;
-    bottom: 28px;
+    /* 提示随菜单排布并可滚动，不能在短窗口下覆盖管理员的末尾菜单项。 */
+    margin-top: auto;
+    padding-top: 24px;
+    flex-shrink: 0;
     font-size: 12px;
     color: #8190a3;
     line-height: 1.8

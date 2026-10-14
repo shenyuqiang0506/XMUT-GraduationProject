@@ -3,7 +3,7 @@
  * 授权管理员维护开放规则、外部占用及预约策略的页面。
  * 规则与占用沿用资源版本，策略按 REAL/DEMO 独立版本；真实规则不预填制度参数。
  */
-import {ref, reactive, onMounted} from 'vue'
+import {ref, reactive, onMounted, onBeforeUnmount} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
 import {useSession} from '../stores/session'
@@ -50,6 +50,9 @@ const rules = ref<OpeningRule[]>([]), occupancies = ref<Occupancy[]>([]),
 const source = ref('MANUAL'), sourceKey = ref<string>(crypto.randomUUID()), start = ref(''), end = ref(''),
     reason = ref('MAINTENANCE')
 const occupancyPage = ref(1), occupancyTotal = ref(0), policyLoading = ref(false)
+const detailLoading = ref(false)
+let resourceRequest = 0, policyRequest = 0
+onBeforeUnmount(() => { resourceRequest++; policyRequest++ })
 // 日常业务默认使用真实来源；测试资料必须显式选择隔离模式。
 const scope = ref('REAL'), policyVersion = ref(0), basis = ref(''),
     settings = reactive<Record<string, number | undefined>>({})
@@ -77,39 +80,62 @@ async function more() {
   await loadResources()
 }
 
-// 切换资源时清空上一资源的规则、占用及分页，再读取详情和占用，避免混用版本号。
+// 固定本次资源编号与请求代数；详情和首页占用一并就绪后才展示可写表单。
+// 允许加载期间继续切换资源，但任何迟到响应都不能写回当前资源的页面。
 async function loadResource() {
+  const id = resourceId.value, request = ++resourceRequest
+  const current = () => request === resourceRequest && id === resourceId.value
+  detailLoading.value = !!id
   error.value = '';
   detail.value = undefined;
   rules.value = [];
   occupancies.value = [];
   occupancyPage.value = 1
+  occupancyTotal.value = 0
   try {
-    if (!resourceId.value) return;
-    detail.value = await api<Detail>('/resources/' + resourceId.value);
-    rules.value = detail.value.openingRules.map(r => ({...r}));
-    await loadOccupancies()
+    if (!id) return
+    const [loaded, data] = await Promise.all([
+      api<Detail>('/resources/' + id),
+      api<Page<Occupancy>>('/admin/resources/' + id + '/external-occupancies?size=100&page=1')
+    ])
+    if (!current()) return
+    if (loaded.id !== id) throw new Error('资源详情与当前选择不一致，请重新加载')
+    detail.value = loaded
+    rules.value = loaded.openingRules.map(r => ({...r}))
+    occupancies.value = data.items
+    occupancyTotal.value = data.total
   } catch (e) {
-    error.value = explain(e)
+    if (current()) error.value = explain(e)
+  } finally {
+    if (current()) detailLoading.value = false
   }
 }
 
-async function loadOccupancies() {
-  const data = await api<Page<Occupancy>>('/admin/resources/' + resourceId.value + '/external-occupancies?size=100&page=' + occupancyPage.value)
-  occupancies.value.push(...data.items)
-  occupancyTotal.value = data.total
+function selectedDetail() {
+  if (detailLoading.value || !detail.value || detail.value.id !== resourceId.value)
+    throw new Error('请等待当前资源加载完成后再操作')
+  return detail.value
 }
 
 async function moreOccupancies() {
-  if (busy.value) return
+  if (busy.value || detailLoading.value || !detail.value) return
+  const id = selectedDetail().id, request = resourceRequest, next = occupancyPage.value + 1
   busy.value = true
-  try { occupancyPage.value++; await loadOccupancies() }
-  catch (e) { occupancyPage.value--; error.value = explain(e) }
+  try {
+    const data = await api<Page<Occupancy>>('/admin/resources/' + id + '/external-occupancies?size=100&page=' + next)
+    if (request !== resourceRequest || id !== resourceId.value) return
+    const seen = new Set(occupancies.value.map(row => row.id))
+    occupancies.value.push(...data.items.filter(row => !seen.has(row.id)))
+    occupancyPage.value = next
+    occupancyTotal.value = data.total
+  }
+  catch (e) { if (request === resourceRequest) error.value = explain(e) }
   finally { busy.value = false }
 }
 
 // 切换策略范围先清空全部参数；只接受仍属于当前范围的响应，防止异步返回顺序覆盖新选择。
 async function loadPolicy() {
+  const request = ++policyRequest
   error.value = ''
   policyLoading.value = true
   const requestedScope = scope.value
@@ -119,15 +145,15 @@ async function loadPolicy() {
   fields.forEach(f => settings[f.key] = undefined)
   try {
     const p = await api<Policy>('/admin/policies/' + requestedScope)
-    if (scope.value !== requestedScope) return
+    if (request !== policyRequest || scope.value !== requestedScope) return
     policyVersion.value = p.version
     basis.value = p.basis || ''
     // 参数只能来自已保存的制度配置；未配置时留空，避免把示例数值当成真实规则。
     fields.forEach(f => settings[f.key] = p.settings?.[f.key])
   } catch (e) {
-    if (scope.value === requestedScope) error.value = explain(e)
+    if (request === policyRequest) error.value = explain(e)
   } finally {
-    if (scope.value === requestedScope) policyLoading.value = false
+    if (request === policyRequest) policyLoading.value = false
   }
 }
 
@@ -138,13 +164,14 @@ onMounted(async () => {
 
 // 一次替换整套规则并带资源版本，成功后重新读取服务器递增后的版本。
 async function saveRules() {
-  if (!detail.value) return;
+  if (busy.value || detailLoading.value) return
   busy.value = true;
   error.value = ''
-  const payload = {expectedVersion: detail.value.version, rules: rules.value}
   try {
-    await api('/admin/resources/' + detail.value.id + '/opening-rules', 'PUT', payload, keys.key('opening:' + detail.value.id, payload));
-    keys.done('opening:' + detail.value.id, payload);
+    const selected = selectedDetail(), id = selected.id
+    const payload = {expectedVersion: selected.version, rules: rules.value.map(rule => ({...rule}))}
+    await api('/admin/resources/' + id + '/opening-rules', 'PUT', payload, keys.key('opening:' + id, payload));
+    keys.done('opening:' + id, payload);
     await loadResource();
     ElMessage.success('开放规则已保存')
   } catch (e) {
@@ -156,19 +183,20 @@ async function saveRules() {
 
 // 只在登记成功后生成新的来源编号；失败重试沿用编号和幂等键，避免重复登记同一占用。
 async function addOccupancy() {
-  if (busy.value) return
+  if (busy.value || detailLoading.value) return
   busy.value = true;
   error.value = ''
   try {
-    if (!resourceId.value || !start.value || !end.value) throw new Error('请选择资源和起止时间');
+    const id = selectedDetail().id
+    if (!start.value || !end.value) throw new Error('请选择资源和起止时间');
     const payload = {
       sourceSystem: source.value,
       sourceKey: sourceKey.value,
       ...shanghaiRange(start.value, end.value),
       reasonCode: reason.value
     }
-    await api('/admin/resources/' + resourceId.value + '/external-occupancies', 'POST', payload, keys.key('occupancy:' + resourceId.value, payload));
-    keys.done('occupancy:' + resourceId.value, payload);
+    await api('/admin/resources/' + id + '/external-occupancies', 'POST', payload, keys.key('occupancy:' + id, payload));
+    keys.done('occupancy:' + id, payload);
     sourceKey.value = crypto.randomUUID();
     await loadResource();
     ElMessage.success('外部占用已登记')
@@ -181,6 +209,7 @@ async function addOccupancy() {
 
 // 通过 active=false 停用记录，保留原区间、原因和版本供服务器校验，不物理删除历史。
 async function disable(row: Occupancy) {
+  if (busy.value || detailLoading.value) return
   busy.value = true;
   error.value = ''
   const payload = {
@@ -191,6 +220,8 @@ async function disable(row: Occupancy) {
     reasonCode: row.reasonCode
   }
   try {
+    selectedDetail()
+    if (!occupancies.value.some(item => item.id === row.id)) throw new Error('占用记录已变化，请重新加载')
     await api('/admin/external-occupancies/' + row.id, 'PATCH', payload, keys.key('disable:' + row.id, payload));
     keys.done('disable:' + row.id, payload);
     await loadResource();
@@ -204,13 +235,15 @@ async function disable(row: Occupancy) {
 
 // 全部参数和制度依据均需明确填写，创建新版本后重新加载生效策略。
 async function savePolicy() {
+  if (busy.value || policyLoading.value) return
+  const selectedScope = scope.value
   busy.value = true;
   error.value = ''
   try {
     if (!basis.value.trim() || fields.some(f => settings[f.key] === undefined)) throw new Error('请填写全部参数和规则依据')
     const payload = {expectedVersion: policyVersion.value, settings: {...settings}, basis: basis.value}
-    await api('/admin/policies/' + scope.value + '/versions', 'POST', payload, keys.key('policy:' + scope.value, payload));
-    keys.done('policy:' + scope.value, payload);
+    await api('/admin/policies/' + selectedScope + '/versions', 'POST', payload, keys.key('policy:' + selectedScope, payload));
+    keys.done('policy:' + selectedScope, payload);
     await loadPolicy();
     ElMessage.success('新策略版本已启用')
   } catch (e) {
@@ -250,11 +283,12 @@ function display(value: string) {
       </el-form-item>
     </el-form>
   </div>
+  <p v-if="detailLoading" role="status">正在加载所选资源的规则和占用…</p>
   <div v-if="detail" class="card">
     <h2>开放规则 · {{ detail.name }} · 版本 {{ detail.version }}</h2>
     <el-alert title="时刻按上海时间解释；删除全部规则会使该资源没有开放时段。" type="info" :closable="false"/>
     <div v-for="(rule,index) in rules" :key="index">
-      <el-form label-position="top">
+      <el-form label-position="top" :disabled="busy||detailLoading">
         <div class="twocol">
           <el-form-item label="星期">
             <el-select v-model="rule.weekday">
@@ -281,8 +315,8 @@ function display(value: string) {
         <el-button text @click="rules.splice(index,1)">删除此规则</el-button>
       </el-form>
     </div>
-    <el-button :disabled="rules.length>=100" @click="addRule">新增开放规则</el-button>
-    <el-button type="primary" :loading="busy" @click="saveRules">保存开放规则</el-button>
+    <el-button :disabled="busy||detailLoading||rules.length>=100" @click="addRule">新增开放规则</el-button>
+    <el-button type="primary" :loading="busy" :disabled="detailLoading" @click="saveRules">保存开放规则</el-button>
   </div>
   <div v-if="detail" class="card"><h2>外部占用（上海时间）</h2>
     <el-form label-position="top" :disabled="busy" @submit.prevent="addOccupancy">

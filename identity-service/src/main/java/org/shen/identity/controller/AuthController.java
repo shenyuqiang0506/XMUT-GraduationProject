@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.shen.identity.application.AuthenticationService;
 import org.shen.identity.domain.AuthCommands;
 import org.shen.identity.infrastructure.LoginThrottle;
+import org.shen.identity.infrastructure.LoginPeerResolver;
 import org.shen.platform.contracts.*;
 import org.slf4j.MDC;
 import org.springframework.context.annotation.Profile;
@@ -27,17 +28,18 @@ import org.springframework.web.bind.annotation.*;
 class AuthController {
     private final AuthenticationService authentication;
     private final LoginThrottle throttle;
+    private final LoginPeerResolver peers;
 
     private ResponseEntity<?> response(Object data) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.success(data, MDC.get(TraceIds.MDC_KEY)));
     }
 
     /**
-     * 先执行来源和账号限流，再验证密码；使用直连地址作为当前限流来源。
+     * 先验证网关签名的来源（直连则使用对端），再执行来源与账号双维度限流。
      */
     @PostMapping("/auth/login")
     ResponseEntity<?> login(@Valid @RequestBody AuthCommands.Login request, jakarta.servlet.http.HttpServletRequest http) {
-        throttle.check(request.username(), http.getRemoteAddr());
+        throttle.check(request.username(), peers.resolve(http));
         return response(authentication.login(request));
     }
 

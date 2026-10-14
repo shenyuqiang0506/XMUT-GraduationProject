@@ -17,13 +17,15 @@ def prepare(environment):
     if source['APP_ENV']!=environment:raise RuntimeError('环境标记不一致')
     private=ROOT/'secrets'/environment
     private.mkdir(mode=0o700,parents=True,exist_ok=True)
-    key=private/'booking-service-call.key'
-    if key.is_symlink():raise RuntimeError('拒绝符号链接密钥目标')
-    if not key.exists():
-        fd=os.open(key,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
-        with os.fdopen(fd,'wb') as stream:stream.write(secrets.token_bytes(32))
-    if len(key.read_bytes())!=32:raise RuntimeError('已有服务签名密钥长度无效，不覆盖')
-    os.chmod(key,0o600)
+    # 登录来源签名只交给网关/身份服务，不能复用预约后台资格查询的密钥。
+    for name in ['booking-service-call.key','login-peer.key']:
+        key=private/name
+        if key.is_symlink():raise RuntimeError('拒绝符号链接密钥目标')
+        if not key.exists():
+            fd=os.open(key,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+            with os.fdopen(fd,'wb') as stream:stream.write(secrets.token_bytes(32))
+        if len(key.read_bytes())!=32:raise RuntimeError('已有服务签名密钥长度无效，不覆盖')
+        os.chmod(key,0o600)
     env=private/'notification.env'
     if env.is_symlink():raise RuntimeError('拒绝符号链接环境文件')
     if not env.exists():

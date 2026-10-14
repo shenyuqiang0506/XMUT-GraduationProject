@@ -22,4 +22,12 @@ class GatewayErrorsTests {
     @Test void wrappedBodyLimitIs413() { check(new RuntimeException(new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE)), 413, "PAYLOAD_TOO_LARGE"); }
     @Test void connectionFailureIs503() { check(new IOException("测试连接故障"), 503, "SERVICE_UNAVAILABLE"); }
     @Test void unknownRouteRemains404() { check(new ResponseStatusException(HttpStatus.NOT_FOUND), 404, "NOT_FOUND"); }
+    @Test void refreshNotForwardedMayBeRetriedButLostResponseMayNot() {
+        for(Throwable failure:java.util.List.of(new java.net.ConnectException("测试拒绝连接"),new IOException("响应丢失"))) {
+            var exchange=MockServerWebExchange.from(MockServerHttpRequest.post("/api/v1/auth/refresh"));
+            new GatewayErrors(new ObjectMapper()).handle(exchange,failure).block();
+            assertThat(exchange.getResponse().getStatusCode().value()).isEqualTo(503);
+            assertThat(exchange.getResponse().getBodyAsString().block()).contains(failure instanceof java.net.ConnectException ? "REFRESH_NOT_EXECUTED" : "SERVICE_UNAVAILABLE");
+        }
+    }
 }

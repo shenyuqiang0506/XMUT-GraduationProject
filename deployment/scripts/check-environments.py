@@ -56,7 +56,10 @@ for env in ['dev','prod']:
         subprocess.run(['git','check-ignore','--quiet',str(path)],cwd=ROOT,check=True)
     service_key=private/'booking-service-call.key'
     assert len(service_key.read_bytes())==32 and stat.S_IMODE(service_key.stat().st_mode)==0o600
-    for path in [service_key,private/'notification.env']:
+    login_key=private/'login-peer.key'
+    assert not login_key.is_symlink() and len(login_key.read_bytes())==32
+    assert login_key.read_bytes()!=service_key.read_bytes(), 'Login source and booking service purposes must use different keys'
+    for path in [service_key,login_key,private/'notification.env']:
         subprocess.run(['git','check-ignore','--quiet',str(path)],cwd=ROOT,check=True)
         assert stat.S_IMODE(path.stat().st_mode)==0o600
     notification=runtime.service_env(env,'notification-service')
@@ -65,6 +68,11 @@ for env in ['dev','prod']:
     assert auth[env]['JWT_ISSUER']=='urn:xmut:'+env+':identity'
     assert auth[env]['JWT_AUDIENCE']=='xmut-'+env+'-api'
     assert Path(auth[env]['IMPORT_STORAGE_DIR']).parent==private
+    # 登录来源凭据只能进入网关和身份服务；后台资格凭据继续只进入预约和身份服务。
+    for service in ['identity-service','booking-service','gateway','ai-service','notification-service']:
+        child=runtime.service_env(env,service)
+        assert ('LOGIN_PEER_KEY_PATH' in child)==(service in ['identity-service','gateway'])
+        if 'LOGIN_PEER_KEY_PATH' in child:assert Path(child['LOGIN_PEER_KEY_PATH'])==login_key
     for service in ['booking-service','gateway','ai-service','notification-service']:
         child=runtime.service_env(env,service)
         assert 'JWT_PRIVATE_KEY_PATH' not in child and 'AUTH_ADMIN_PASSWORD' not in child and 'IDENTITY_DB_PASSWORD' not in child
@@ -76,4 +84,5 @@ assert (ROOT/'secrets/dev/jwt-public.pem').read_bytes()!=(ROOT/'secrets/prod/jwt
 print('PASS: independent dev/prod JWT keys, issuer, audience and import directories; private signing key stays in identity service.')
 assert fingerprints['dev']!=fingerprints['prod']
 assert (ROOT/'secrets/dev/booking-service-call.key').read_bytes()!=(ROOT/'secrets/prod/booking-service-call.key').read_bytes()
-print('PASS: independent password fingerprint keys stay private to identity; gateway only receives its own Redis credential.')
+assert (ROOT/'secrets/dev/login-peer.key').read_bytes()!=(ROOT/'secrets/prod/login-peer.key').read_bytes()
+print('PASS: independent password fingerprint keys stay private to identity; login source keys go only to gateway/identity, mode 600 and Git-ignored.')

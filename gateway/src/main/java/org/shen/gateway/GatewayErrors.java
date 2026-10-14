@@ -24,9 +24,12 @@ final class GatewayErrors implements ErrorWebExceptionHandler {
     public Mono<Void> handle(ServerWebExchange exchange, Throwable failure) {
         if (exchange.getResponse().isCommitted()) return Mono.error(failure);
         int status = 500;
+        boolean notConnected = false;
         // 响应式转发可能包装请求体异常；沿有限因果链识别 413，不能改写成 503。
         Throwable cause = failure;
         for (int depth = 0; cause != null && depth < 8; depth++, cause = cause.getCause()) {
+            if (cause instanceof org.springframework.cloud.gateway.support.NotFoundException || cause instanceof java.net.ConnectException)
+                notConnected = true;
             if (cause instanceof ResponseStatusException response) { status = response.getStatusCode().value(); break; }
             if (cause instanceof java.io.IOException || cause instanceof java.util.concurrent.TimeoutException) status = 503;
         }
@@ -43,6 +46,9 @@ final class GatewayErrors implements ErrorWebExceptionHandler {
             case 502, 503, 504 -> "SERVICE_UNAVAILABLE";
             default -> "INTERNAL_ERROR";
         };
+        // 没有下游实例或 TCP 连接尚未建立，刷新确定未转发。转发超时/响应丢失不能作此保证。
+        if (status == 503 && notConnected && "/api/v1/auth/refresh".equals(exchange.getRequest().getPath().value()))
+            code = "REFRESH_NOT_EXECUTED";
         String message = status == 413 ? "请求内容超过大小限制" : status == 404 ? "请求路径不存在"
                 : status >= 500 && status != 500 ? "服务暂不可用" : "请求未能完成";
         return write(exchange, json, status, code, message);

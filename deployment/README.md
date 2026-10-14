@@ -136,6 +136,8 @@ IDEA 调试可先在仓库根目录执行 `python3 deployment/scripts/prepare-id
 
 2026-10-14 修复内层工程的路径兼容：四个共享配置和内层本机配置统一使用 `$MODULE_WORKING_DIR$` 工作目录，VM 参数为 `-Dspring.config.additional-location="file:../deployment/secrets/dev/idea/<服务名>.properties"`。路径按服务模块内容根定位，避免 `$PROJECT_DIR$` 随打开的 IDEA 工程变化而重复拼接 GraduationProject。[JetBrains 模块目录说明](https://blog.jetbrains.com/idea/2018/05/intellij-idea-2018-1-4-is-released/)。准备脚本现统一重生成四个服务配置；验证脚本读取实际 XML、检查外层/内层上下文解析结果，并从同一工作目录用实际 JVM 参数启动，不再通过另一个硬编码绝对路径绕过配置错误。缺少私密文件时保留失败，不使用 `optional:` 隐藏错误。
 
+实际 UI 排查还发现 IDEA 内存中保留了旧的绝对路径；已在“运行 → 编辑配置”内更新并逐个应用，再从 IDEA 真正运行四个服务，详见 [实际启动验证](../开发文档/docs/verification/2026-10-14/business/idea-ui-startup.json)。如果 IDE 界面里的参数与磁盘 XML 不一致，必须更新当前配置并保存后重试。IDEA 保存时可将共享文件改名为中文显示名，并为工作目录加 `file://`；生成器现在按配置名称查找已有文件，避免再生成重复名称的旧文件，验证器识别这种序列化形式。共享文件和 `.idea/runConfigurations` 本机适配文件均不包含凭据值。
+
 Flyway 已执行的版本迁移保持原始内容，后续结构变更新增迁移。不要对历史 `V*.sql` 自动格式化，也不要关闭迁移校验来绕过 checksum mismatch。
 
 Web 安装/构建在 `web-admin` 执行 `npm ci && npm run build`。本次运行环境 Node 26.10.0、npm 11.19.1；直接依赖固定版本，`package-lock.json` 锁定传递依赖。TypeScript 固定 5.9.3，当前 vue-tsc 3.3.13 与 TypeScript 7 不兼容。Node 版本需满足 Vite 的 `engines`。

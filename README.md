@@ -42,7 +42,9 @@ python3 deployment/scripts/prepare-idea.py
 
 凭据变更后重新执行准备脚本；已有内层 IDEA 工程会生成对应的本机运行配置。总启动包含四个后端服务，Web 仍在 `web-admin` 执行 `npm run dev`。停止时需停止四项后端进程，Docker 独立运行。
 
-共享配置以 `$MODULE_WORKING_DIR$` 作为工作目录，从服务模块通过 `file:../deployment/secrets/dev/idea/<服务名>.properties` 加载私密配置。因此打开仓库或内层 `GraduationProject` 工程时都指向同一份文件。若旧配置报错路径含 `GraduationProject/GraduationProject/deployment`，重新执行 `prepare-idea.py` 并重新打开运行配置；不要添加 `optional:` 跳过必须的数据库与身份配置。`verify-idea.py` 会读取实际 XML 校验两种工程上下文并启动验证。
+共享配置以 `$MODULE_WORKING_DIR$` 作为工作目录，从服务模块通过 `file:../deployment/secrets/dev/idea/<服务名>.properties` 加载私密配置。因此打开仓库或内层 `GraduationProject` 工程时都指向同一份文件。若旧配置报错路径含 `GraduationProject/GraduationProject/deployment`，重新执行 `prepare-idea.py`；若 IDEA 界面仍保留旧参数，需在“运行 → 编辑配置”中更新对应服务的 JVM 参数和工作目录并点击“应用”。修改磁盘 XML 不代表 IDE 内存中的旧配置已经刷新。不要添加 `optional:` 跳过必须的数据库与身份配置。`verify-idea.py` 会读取实际 XML 校验两种工程上下文并启动验证。
+
+2026-10-14 已在 IDEA 中重新保存配置并实际运行“后端总启动（dev）”，四服务就绪及网关鉴权通过，见 [IDEA 实际启动记录](开发文档/docs/verification/2026-10-14/business/idea-ui-startup.json)。生成器按配置名称复用 IDEA 保存的文件名，验证器兼容工作目录保存为 `file://$MODULE_WORKING_DIR$` 的格式。
 
 已执行的 Flyway `V*.sql` 必须保持原始内容，包括排版；表结构变更应新增版本迁移。否则格式化也可能导致启动时 checksum mismatch。
 

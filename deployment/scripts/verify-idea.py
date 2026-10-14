@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify IDEA-equivalent dev startup; always stop temporary backend processes."""
 import json
+import importlib.util
 import os
 from pathlib import Path
 import shlex
@@ -14,7 +15,11 @@ import xml.etree.ElementTree as ET
 
 REPO=Path(__file__).resolve().parents[2]
 PRIVATE=REPO/'deployment/secrets/dev/idea'
-SERVICES=[('identity-service',8083),('booking-service',8082),('gateway',8081),('notification-service',8085)]
+# 与生成器共用服务名及文件定位逻辑，兼容 IDEA 按中文配置名重新保存的文件。
+spec=importlib.util.spec_from_file_location('idea_prepare',Path(__file__).with_name('prepare-idea.py'))
+prepare=importlib.util.module_from_spec(spec);spec.loader.exec_module(prepare)
+SERVICES=[(service,port) for service,_,_,_,port in prepare.SERVICES]
+CONFIG_NAMES={service:name for service,_,_,name,_ in prepare.SERVICES}
 
 # 读取实际共享 XML，而不是用另一个硬编码绝对路径掩盖 IDEA 宏或工作目录错误。
 # 同时检查外层/内层项目上下文，随后用解析得到的同一组 JVM 参数实际启动服务。
@@ -27,6 +32,8 @@ def launch_settings(path,service,project):
     options={option.get('name'):option.get('value') for option in configuration.findall('option')}
     module_dir=REPO/module
     working=(options.get('WORKING_DIRECTORY') or '').replace('$MODULE_WORKING_DIR$',str(module_dir)).replace('$PROJECT_DIR$',str(project))
+    # 实际 IDEA 保存后的 XML 使用 file:// URI；去掉前缀后才是 subprocess 的文件系统工作目录。
+    working=working.removeprefix('file://')
     if not working or '$' in working or not Path(working).is_dir():
         raise RuntimeError('IDEA working directory invalid: '+service)
     arguments=[arg.replace('$PROJECT_DIR$',str(project)) for arg in shlex.split(options.get('VM_PARAMETERS') or '')]
@@ -49,7 +56,7 @@ def main():
         properties=PRIVATE/(name+'.properties')
         if not properties.exists() or stat.S_IMODE(properties.stat().st_mode)!=0o600:
             raise RuntimeError('Run prepare-idea.py first; private configurations must have mode 600.')
-        shared=REPO/'.run'/('Campus_'+name+'.run.xml')
+        shared=prepare.shared_configuration_path(REPO/'.run',CONFIG_NAMES[name])
         outer=launch_settings(shared,name,REPO)
         inner=launch_settings(shared,name,REPO/'GraduationProject')
         if outer!=inner:raise RuntimeError('IDEA configuration depends on the opened project root: '+name)

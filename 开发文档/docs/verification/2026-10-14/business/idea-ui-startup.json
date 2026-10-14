@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-14",
+  "verifiedAt": "2026-10-14T10:52:52+08:00",
+  "result": "PASS",
+  "cause": "磁盘 XML 已修正，但 IDEA 内存中的身份、预约和通知运行配置仍保留旧的重复目录绝对路径",
+  "actions": [
+    "在 IDEA 运行配置界面修正三份 JVM 参数和工作目录，逐个应用",
+    "核对网关已使用正确配置",
+    "在 IDEA 中实际运行后端总启动（dev）"
+  ],
+  "verification": {
+    "source": "IDEA 实际启动，非另起 JAR 等效进程",
+    "readiness": {
+      "8081": "UP",
+      "8082": "UP",
+      "8083": "UP",
+      "8085": "UP"
+    },
+    "gatewayUnauthorizedStatus": 401,
+    "uiEvidence": "服务窗口显示四个端口；通知控制台显示 Started NotificationApplication",
+    "savedXmlAndGeneratorAgree": true,
+    "outerAndInnerPathsAgree": true,
+    "duplicateConfigNameDetection": "PASS"
+  },
+  "configuration": {
+    "workingDirectoryInUi": "$MODULE_WORKING_DIR$",
+    "workingDirectoryInSavedXml": "file://$MODULE_WORKING_DIR$",
+    "jvmLocation": "file:../deployment/secrets/dev/idea/<service>.properties",
+    "filenames": "按配置显示名称复用实际保存文件"
+  },
+  "state": {
+    "fourIdeaServicesLeftRunning": true,
+    "prodStarted": false,
+    "passwordsChanged": false,
+    "rawCredentialsOrConsoleClasspathSaved": false
+  }
+}

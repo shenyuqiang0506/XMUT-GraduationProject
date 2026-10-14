@@ -46,7 +46,8 @@ def config(service,module,main,name):
     ET.SubElement(conf,'option',name='SPRING_BOOT_MAIN_CLASS',value=main)
     vm='-Dspring.config.additional-location="file:../deployment/secrets/dev/idea/'+service+'.properties"'
     ET.SubElement(conf,'option',name='VM_PARAMETERS',value=vm)
-    ET.SubElement(conf,'option',name='WORKING_DIRECTORY',value='$MODULE_WORKING_DIR$')
+    # IDEA 保存时会为工作目录补 file://；直接使用其格式，避免保存前后出现不同表示。
+    ET.SubElement(conf,'option',name='WORKING_DIRECTORY',value='file://$MODULE_WORKING_DIR$')
     method=ET.SubElement(conf,'method',v='2');ET.SubElement(method,'option',name='Make',enabled='true')
     return root
 
@@ -60,6 +61,16 @@ def compound():
 
 def write_xml(path,root):
     ET.indent(root,space='  ');path.write_text(ET.tostring(root,encoding='unicode')+'\n')
+
+# IDEA 可在保存运行配置时按中文显示名重命名 .run.xml。
+# 按配置名称复用现有文件，不能重新生成另一份 Campus_* 同名配置，让内存中的旧配置继续被选中。
+def shared_configuration_path(directory,name):
+    matches=[]
+    for path in directory.glob('*.run.xml'):
+        configuration=ET.parse(path).getroot().find('configuration')
+        if configuration is not None and configuration.get('name')==name:matches.append(path)
+    if len(matches)>1:raise RuntimeError('Duplicate shared IDEA configuration name: '+name)
+    return matches[0] if matches else directory/(name+'.run.xml')
 
 # 通过各服务的键白名单生成 dev 配置，限制签名私钥及数据库密码的分发范围。
 # 拒绝符号链接目标，文件写入权限保持为 600。
@@ -83,8 +94,8 @@ def main():
     shared=REPO/'.run';shared.mkdir(exist_ok=True)
     # 全部服务共用同一生成逻辑，防止只有新增服务修正而旧身份/预约配置仍保留错误路径。
     for service,module,main_class,name,_ in SERVICES:
-        write_xml(shared/('Campus_'+service+'.run.xml'),config(service,module,main_class,name))
-    write_xml(shared/'Campus_Backend_dev.run.xml',compound())
+        write_xml(shared_configuration_path(shared,name),config(service,module,main_class,name))
+    write_xml(shared_configuration_path(shared,'后端总启动（dev）'),compound())
     # The user's existing IDEA project lives in the inner directory. Keep its local configs ignored.
     inner=REPO/'GraduationProject/.idea'
     if (inner/'workspace.xml').exists():

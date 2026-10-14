@@ -75,6 +75,16 @@ public class BookingPolicies {
                 "settings", json.readValue(row.get("settings").toString(), Map.class), "basis", row.get("basis"));
     }
 
+    /** 普通申请人查询生效制度，不授予修改策略或管理员权限；仅返回当前模式公开规则。 */
+    public Map<String,Object> publicRules(AuthActor actor,String scope) {
+        mode(scope);
+        var rows=sql.queryForList("SELECT policy_version,settings,basis FROM booking_policy WHERE scope_code=? AND active=1",scope);
+        if(rows.isEmpty())return Map.of("scopeCode",scope,"configured",false,"version",0);
+        var row=rows.getFirst();
+        return Map.of("scopeCode",scope,"configured",true,"version",row.get("policy_version"),
+            "settings",json.readValue(row.get("settings").toString(),Map.class),"basis",row.get("basis"));
+    }
+
     /**
      * 只允许系统管理员带版本和制度依据创建新策略。守卫行保证首次创建也有可锁对象。
      */

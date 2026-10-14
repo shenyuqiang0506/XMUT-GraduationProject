@@ -271,11 +271,24 @@ public class AvailabilityQueries {
         var usable = equipment.stream().filter(r -> "AVAILABLE".equals(status(r, window, policy, now, data))).toList();
         var index = new EquipmentIndex(usable);
         var plans = matchPlans(venues, requirements, index, window, policy, now, data, input.dataMode());
+        // 无匹配时仅汇总当前用户可见候选的原因类别，不返回不可见资源或他人活动信息。
+        var reasons=new TreeSet<String>();
+        if(plans.isEmpty()) {
+            if(venues.isEmpty())reasons.add("NO_MATCHING_CATALOG");
+            for(var venue:venues) {
+                switch(status(venue,window,policy,now,data)) {
+                    case "BUSY" -> reasons.add("TIME_OCCUPIED");
+                    case "CLOSED" -> reasons.add("OUTSIDE_OPENING_OR_CLOSED");
+                    case "UNKNOWN" -> reasons.add("COVERAGE_UNKNOWN");
+                    default -> reasons.add("EQUIPMENT_UNAVAILABLE_OR_INSUFFICIENT");
+                }
+            }
+        }
         // 分页作用于已通过全部校验的场地组合，total 是可行场地数，而非初始候选数。
         int offset = Math.min(plans.size(), (input.page() - 1) * input.size());
         // 结果是当前快照，不创建暂占；后续提交联合预约时必须再次锁资源并校验。
         return Map.of("items", plans.subList(offset, Math.min(plans.size(), offset + input.size())), "page", input.page(),
-                "size", input.size(), "total", plans.size(), "checkedAt", TimeWindow.display(now));
+                "size", input.size(), "total", plans.size(), "checkedAt", TimeWindow.display(now), "reasonCodes",reasons);
     }
 
     /** 组合匹配与 SQL 查询分开，复用设备索引，避免每个场地、每类需求反复扫描全体设备。 */

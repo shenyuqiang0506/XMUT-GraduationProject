@@ -53,6 +53,16 @@ class CatalogController {
         return ok(resources.detail(actor, id));
     }
 
+    @GetMapping("/resources/options")
+    ApiResponse<?> options(@AuthenticationPrincipal AuthActor actor,@RequestParam String dataMode) {
+        return ok(resources.options(actor,dataMode));
+    }
+
+    @PostMapping("/resources/details")
+    ApiResponse<?> details(@AuthenticationPrincipal AuthActor actor,@RequestBody java.util.List<String> resourceIds) {
+        return ok(resources.details(actor,resourceIds));
+    }
+
     /**
      * 创建资源时转交完整输入与幂等键，由应用层检查审批组及来源开放约束。
      */

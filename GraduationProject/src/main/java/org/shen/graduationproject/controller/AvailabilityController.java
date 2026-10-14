@@ -99,6 +99,11 @@ class AvailabilityController {
         return ok(policies.get(actor, scope));
     }
 
+    @GetMapping("/booking-rules")
+    ApiResponse<?> rules(@AuthenticationPrincipal AuthActor actor,@RequestParam String dataMode) {
+        return ok(policies.publicRules(actor,dataMode));
+    }
+
     /**
      * 仅系统管理员可以带制度依据和当前版本创建新策略版本。
      */

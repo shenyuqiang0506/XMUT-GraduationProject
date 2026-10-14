@@ -102,6 +102,24 @@ public class ResourceCatalog {
         return result;
     }
 
+    /** 只读工具使用的可见选项，按模式与实时授权范围查询，不能暴露隐藏目录名称。 */
+    public Map<String,Object> options(AuthActor actor,String mode) {
+        dataModes.check(mode);
+        String where=" WHERE ("+access.visibleSql(actor)+") AND r.data_mode=?";
+        var campuses=sql.queryForList("SELECT DISTINCT r.campus FROM resource r"+where+" AND r.campus IS NOT NULL AND TRIM(r.campus)<>'' ORDER BY r.campus LIMIT 201",String.class,mode);
+        var types=sql.queryForList("SELECT DISTINCT e.equipment_type FROM resource r JOIN equipment_detail e ON e.resource_id=r.id"+where+" ORDER BY e.equipment_type LIMIT 201",String.class,mode);
+        if(campuses.size()>200||types.size()>200)throw new BusinessException(422,"QUERY_TOO_BROAD","目录选项过多，请联系管理员整理类型");
+        return Map.of("campuses",campuses,"equipmentTypes",types,"dataMode",mode);
+    }
+
+    /** 最多读取 128 个已明确选中的资源；每项继续复用详情授权，不提供任意 SQL 或 URL。 */
+    @org.springframework.transaction.annotation.Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public List<Map<String,Object>> details(AuthActor actor,List<String> ids) {
+        if(ids==null||ids.isEmpty()||ids.size()>128||new HashSet<>(ids).size()!=ids.size())
+            throw new BusinessException(400,"VALIDATION_ERROR","详情批量需要 1 至 128 个不同资源编号");
+        return ids.stream().map(CatalogAccess::id).sorted().map(id -> detail(actor,id)).toList();
+    }
+
     /**
      * 先应用当前用户可见范围，再拼接白名单筛选列；筛选值通过 JDBC 参数绑定传入。
      */

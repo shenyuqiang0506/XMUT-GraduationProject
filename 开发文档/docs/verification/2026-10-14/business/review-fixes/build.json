@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-14",
+  "baseCommit": "c5161b7",
+  "javaModules": 8,
+  "javaCommand": "package",
+  "java": {
+    "tests": 75,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "frontendBuild": "passed",
+  "frontendTests": 23,
+  "frontendFailures": 0,
+  "loginKeys": {
+    "environmentsIndependent": true,
+    "lengthBytes": 32,
+    "filePermissions": "600",
+    "recipientServices": [
+      "gateway",
+      "identity-service"
+    ]
+  },
+  "productionStarted": false,
+  "migrationsModified": false,
+  "resolvedFindings": [
+    "rules-resource-race",
+    "gateway-shared-login-peer",
+    "duplicate-occupancy-fragment",
+    "equipment-type-contract",
+    "waitlist-fallback-conflict",
+    "catalog-demo-environment",
+    "list-response-race",
+    "refresh-503-session-clear"
+  ],
+  "additionalFix": "侧栏底部提示不再遮挡管理员菜单",
+  "gatewayApplicationPropertiesExistingChangeExcluded": true,
+  "authenticationRegressionChecks": 16,
+  "environmentIsolation": "passed"
+}

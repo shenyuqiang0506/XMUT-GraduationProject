@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-14",
+  "mode": "dev-business-real-infrastructure",
+  "checks": [
+    {
+      "check": "Identity migration and dev-only administrator bootstrap; all three services ready",
+      "result": "PASS"
+    },
+    {
+      "check": "Gateway login, RS256 claims, authoritative administrator identity and traceId",
+      "result": "PASS"
+    },
+    {
+      "check": "演示路由与内部接口均返回 404，Basic 认证不能访问正式业务",
+      "result": "PASS"
+    },
+    {
+      "check": "Unauthenticated and forged identity headers rejected",
+      "result": "PASS"
+    },
+    {
+      "check": "Account creation is authorized, idempotent and rejects changed payloads",
+      "result": "PASS"
+    },
+    {
+      "check": "Wrong password rejected; database roles prevent student access and role-claim spoofing",
+      "result": "PASS"
+    },
+    {
+      "check": "Wrong audience/issuer, expired token, invalid session claim and non-RS256 algorithm rejected",
+      "result": "PASS"
+    },
+    {
+      "check": "Booking verifies signature and resolves current session through identity service",
+      "result": "PASS"
+    },
+    {
+      "check": "Refresh device binding, rotation, replay revocation and downstream enforcement",
+      "result": "PASS"
+    },
+    {
+      "check": "Concurrent refresh serializes; one rotation succeeds and replay revokes the session",
+      "result": "PASS"
+    },
+    {
+      "check": "Role changes revoke sessions; stale version rejected; disabled user cannot log in",
+      "result": "PASS"
+    },
+    {
+      "check": "Logout immediately revokes both access and refresh credentials",
+      "result": "PASS"
+    },
+    {
+      "check": "MySQL persists BCrypt/password and refresh hashes plus audit records, without plain credentials",
+      "result": "PASS"
+    },
+    {
+      "check": "Pagination and request validation enforce server-side limits",
+      "result": "PASS"
+    },
+    {
+      "check": "Identity outage produces controlled 503; no default-allow session fallback",
+      "result": "PASS"
+    },
+    {
+      "check": "Redis outage keeps authoritative DB session checks and logout revocation; new login fails closed when throttling is unavailable",
+      "result": "PASS"
+    }
+  ],
+  "passed": 16,
+  "failed": 0,
+  "scope": "Formal identity APIs; catalog and reservation acceptance are separate"
+}

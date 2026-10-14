@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-14",
+  "mode": "isolated-dev-real-mysql-redis-nacos",
+  "ports": {
+    "gateway": 18981,
+    "booking-service": 18982,
+    "identity-service": 18983
+  },
+  "checks": [
+    {
+      "check": "中文及带空格设备类型可创建并参与真实可用组合查询",
+      "result": "PASS"
+    },
+    {
+      "check": "真实 MySQL 重复裁剪复用片段、恢复停用片段、拒绝旧版本并保留原观察时间和批次",
+      "result": "PASS"
+    },
+    {
+      "check": "空闲但已有队列可继续入队；FIFO、去重、WAITING 不占资源及队列结束恢复普通申请",
+      "result": "PASS"
+    },
+    {
+      "check": "真实 Redis 下 35 个独立签名来源不会共用网关来源桶",
+      "result": "PASS"
+    },
+    {
+      "check": "来源 30 次与账号 10 次限流仍生效；重放拒绝，网关清除伪造来源头",
+      "result": "PASS"
+    }
+  ],
+  "productionStarted": false,
+  "fixturesCleaned": true,
+  "testProcessesStopped": true,
+  "realDataModified": false,
+  "rabbitFaultInjected": false
+}

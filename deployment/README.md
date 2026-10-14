@@ -174,6 +174,8 @@ M3 的 Flyway V2 已在本机 dev 执行，不得重新排版；以后结构变�
 
 已有 M3 私密凭据后执行 `prepare-messaging.py dev` 与 `prepare-messaging.py prod`，为两个环境生成独立服务签名密钥及 notification.env，已有账号密码不变。通知仅使用自己的分库凭据。执行 `bootstrap-nacos.py dev` 添加通知服务环境标记，再执行 `prepare-idea.py`；不启动 prod。后端总启动新增 notification 8085，命令行启动器同样适配。
 
+2026-10-14 复审升级新增 `secrets/<环境>/login-peer.key`，只由网关和身份服务读取 `LOGIN_PEER_KEY_PATH`。升级已有环境需再次运行上述两个 prepare 脚本；已有密钥不会轮换，两个环境的新密钥独立生成并保持权限 600。本机 dev 私密 IDEA 配置已更新，重启后即可生效。登录按签名客户端地址与账号分别限流，普通 Forwarded/X-Forwarded-For 不可信；当前网关采用 TCP 对端，前置代理部署需另行设计可信入口链，不能直接打开转发头信任。
+
 预约 V4、通知 V1 已执行，历史迁移不可编辑；此前已备份两库至私密 backups 目录。默认不自动接管 legacy 事件，维护者备份审查后才显式接管。SENT 表示发布确认，用户已读另有状态。
 
 ```sh

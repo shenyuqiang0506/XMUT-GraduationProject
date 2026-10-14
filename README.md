@@ -134,6 +134,7 @@ XMUT_WEB_TEST=1 python3 deployment/scripts/waitlists-messaging-smoke.py
 
 ## 验证记录
 
+- [M4 复审修复与回归](开发文档/docs/development/21-M4复审修复与回归.md)
 - [M4 候补与消息](开发文档/docs/development/20-M4候补与消息.md)
 - [M3 联合预约闭环](开发文档/docs/development/19-M3联合预约闭环.md)
 - [后端可靠性与网关保护](开发文档/docs/development/18-后端可靠性与网关保护.md)

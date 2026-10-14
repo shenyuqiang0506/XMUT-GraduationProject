@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="智能查询服务（dev）" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="ai-service" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="org.shen.ai.AiApplication" />
+    <option name="VM_PARAMETERS" value="-Dspring.config.additional-location=&quot;file:../deployment/secrets/dev/idea/ai-service.properties&quot;" />
+    <option name="WORKING_DIRECTORY" value="file://$MODULE_WORKING_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

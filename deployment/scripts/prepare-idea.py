@@ -12,12 +12,14 @@ runtime=importlib.util.module_from_spec(spec);spec.loader.exec_module(runtime)
 SERVICES=[('identity-service','identity-service','org.shen.identity.IdentityApplication','身份服务（dev）',8083),
           ('booking-service','GraduationProject','org.shen.graduationproject.GraduationProjectApplication','预约服务（dev）',8082),
           ('gateway','gateway','org.shen.gateway.GatewayApplication','网关（dev）',8081),
-          ('notification-service','notification-service','org.shen.notification.NotificationApplication','通知服务（dev）',8085)]
+          ('notification-service','notification-service','org.shen.notification.NotificationApplication','通知服务（dev）',8085),
+          ('ai-service','ai-service','org.shen.ai.AiApplication','智能查询服务（dev）',8084)]
 COMMON=['JWT_PUBLIC_KEY_PATH','JWT_ISSUER','JWT_AUDIENCE','JWT_KEY_ID','IMPORT_STORAGE_DIR','NACOS_SERVER_ADDR','NACOS_USERNAME','NACOS_PASSWORD']
 IDENTITY=['SERVICE_CALL_KEY_PATH','LOGIN_PEER_KEY_PATH','JWT_PRIVATE_KEY_PATH','AUTH_PASSWORD_FINGERPRINT_KEY_PATH','IDENTITY_DB_URL','IDENTITY_DB_USERNAME','IDENTITY_DB_PASSWORD','REDIS_HOST','REDIS_PORT','REDIS_PASSWORD','AUTH_ADMIN_USERNAME','AUTH_ADMIN_PASSWORD']
 GATEWAY=['LOGIN_PEER_KEY_PATH','REDIS_HOST','REDIS_PORT','REDIS_PASSWORD']
 NOTIFICATION=['NOTIFICATION_DB_URL','NOTIFICATION_DB_USERNAME','NOTIFICATION_DB_PASSWORD','RABBITMQ_HOST','RABBITMQ_PORT','RABBITMQ_USERNAME','RABBITMQ_PASSWORD','RABBITMQ_VHOST']
 BOOKING=['SERVICE_CALL_KEY_PATH','DB_URL','DB_USERNAME','DB_PASSWORD','REDIS_HOST','REDIS_PORT','REDIS_PASSWORD','RABBITMQ_HOST','RABBITMQ_PORT','RABBITMQ_USERNAME','RABBITMQ_PASSWORD','RABBITMQ_VHOST']
+AI=['AI_DB_URL','AI_DB_USERNAME','AI_DB_PASSWORD','AI_PROVIDER','AI_BASE_URL','AI_MODEL','AI_API_KEY','AI_TIMEOUT','AI_HOURLY_LIMIT']
 
 # 按 Java properties 语法转义值，保留空格、分隔符及中文路径。
 # 非 ASCII 字符按 UTF-16 编码，兼容 properties 文件的 Unicode 转义读取。
@@ -36,7 +38,7 @@ def escape(value):
     return ''.join(out)
 
 # IDEA 项目根可能是仓库，也可能是内层 GraduationProject，不能据此推算凭据路径。
-# 四个 Maven 服务的内容根均直接位于仓库下，固定从模块目录回到 deployment。
+# 五个 Maven 服务的内容根均直接位于仓库下，固定从模块目录回到 deployment。
 # MODULE_WORKING_DIR 只用于 IDEA 支持的工作目录字段；JVM 参数使用普通相对文件路径。
 # 运行配置只引用私密 properties 的路径，不把密码嵌入共享 XML。
 def config(service,module,main,name):
@@ -51,7 +53,7 @@ def config(service,module,main,name):
     method=ET.SubElement(conf,'method',v='2');ET.SubElement(method,'option',name='Make',enabled='true')
     return root
 
-# 组合启动身份、预约、通知和网关四个后端服务，数据库等基础设施由 Docker 单独管理。
+# 组合启动身份、预约、通知、智能查询和网关五个后端服务，基础设施由 Docker 单独管理。
 def compound():
     root=ET.Element('component',name='ProjectRunConfigurationManager')
     conf=ET.SubElement(root,'configuration',default='false',name='后端总启动（dev）',type='CompoundRunConfigurationType')
@@ -78,7 +80,7 @@ def main():
     PRIVATE.mkdir(mode=0o700,parents=True,exist_ok=True);os.chmod(PRIVATE,0o700)
     for service,module,main_class,name,port in SERVICES:
         env=runtime.service_env('dev',service,service=='identity-service')
-        keys=COMMON+(IDENTITY if service=='identity-service' else BOOKING if service=='booking-service' else NOTIFICATION if service=='notification-service' else GATEWAY)
+        keys=COMMON+(IDENTITY if service=='identity-service' else BOOKING if service=='booking-service' else NOTIFICATION if service=='notification-service' else AI if service=='ai-service' else GATEWAY)
         values={k:env[k] for k in keys if k in env}
         for required in ['JWT_PUBLIC_KEY_PATH','JWT_ISSUER','JWT_AUDIENCE','NACOS_USERNAME','NACOS_PASSWORD']:
             if not values.get(required):raise RuntimeError('Missing private dev configuration: '+required)

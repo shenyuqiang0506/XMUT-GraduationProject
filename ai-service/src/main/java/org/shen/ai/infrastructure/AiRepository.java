@@ -121,7 +121,7 @@ public class AiRepository {
 
     public Map<String, Object> list(AuthActor actor) {
         applicant(actor);
-        String modes = environment.acceptsProfiles(Profiles.of("prod")) ? " AND data_mode='REAL'" : "";
+        String modes = environment.acceptsProfiles(Profiles.of("prod")) || !environment.acceptsProfiles(Profiles.of("dev","test")) ? " AND data_mode='REAL'" : "";
         var rows = sql.queryForList("SELECT * FROM ai_conversation WHERE owner_id=? AND status='ACTIVE'" + modes + " ORDER BY updated_at DESC,id DESC LIMIT 20", Long.parseLong(actor.userId()));
         return Map.of("items", rows.stream().map(this::view).toList());
     }

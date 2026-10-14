@@ -65,6 +65,16 @@ for env in ['dev','prod']:
     notification=runtime.service_env(env,'notification-service')
     assert notification['NOTIFICATION_DB_USERNAME']==values[env]['NOTIFICATION_DB_USER']
     assert 'DB_PASSWORD' not in notification and 'REDIS_PASSWORD' not in notification and 'SERVICE_CALL_KEY_PATH' not in notification
+    ai=runtime.service_env(env,'ai-service')
+    assert ai['AI_DB_USERNAME']==values[env]['AI_DB_USER']
+    assert 'DB_PASSWORD' not in ai and 'IDENTITY_DB_PASSWORD' not in ai and 'LOGIN_PEER_KEY_PATH' not in ai and 'SERVICE_CALL_KEY_PATH' not in ai
+    ai_file=private/'ai.env'
+    assert stat.S_IMODE(ai_file.stat().st_mode)==0o600
+    subprocess.run(['git','check-ignore','--quiet',str(ai_file)],cwd=ROOT,check=True)
+    if env=='prod':
+        assert ai['AI_PROVIDER']=='disabled' and 'AI_API_KEY' not in ai, 'Prod must not inherit a dev model key'
+    for service in ['identity-service','booking-service','gateway','notification-service']:
+        assert not any(key.startswith('AI_') for key in runtime.service_env(env,service)), 'AI credentials leaked to another service'
     assert auth[env]['JWT_ISSUER']=='urn:xmut:'+env+':identity'
     assert auth[env]['JWT_AUDIENCE']=='xmut-'+env+'-api'
     assert Path(auth[env]['IMPORT_STORAGE_DIR']).parent==private

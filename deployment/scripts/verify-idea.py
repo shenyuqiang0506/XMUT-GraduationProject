@@ -45,7 +45,7 @@ def launch_settings(path,service,project):
         raise RuntimeError('IDEA configuration does not resolve to the repository private file: '+service)
     return Path(working).resolve(),arguments
 
-# 以真实 XML 中的 additional-location 参数启动四个临时服务，检查就绪与网关鉴权。
+# 以真实 XML 中的 additional-location 参数启动五个临时服务，检查就绪与网关鉴权。
 # 执行前要求端口空闲，结束时清理本次创建的进程。
 def main():
     settings={}
@@ -84,7 +84,7 @@ def main():
             # 清除父进程继承的服务配置，确保验证结果来自 IDEA 的 properties 文件。
             env=os.environ.copy()
             for key in list(env):
-                if key.startswith(('SPRING_','JWT_','AUTH_','DB_','IDENTITY_','NOTIFICATION_','SERVICE_CALL_','REDIS_','RABBITMQ_','NACOS_','SERVER_','IMPORT_')):
+                if key.startswith(('SPRING_','JWT_','AUTH_','DB_','IDENTITY_','NOTIFICATION_','SERVICE_CALL_','LOGIN_PEER_','AI_','REDIS_','RABBITMQ_','NACOS_','SERVER_','IMPORT_')):
                     env.pop(key,None)
             process=subprocess.Popen(command,env=env,cwd=working,stdout=log,stderr=subprocess.STDOUT)
             children.append((process,log))
@@ -99,7 +99,7 @@ def main():
                 except (urllib.error.URLError,TimeoutError):pass
             time.sleep(.3)
         if waiting:raise RuntimeError('IDEA-equivalent readiness timeout.')
-        print('PASS: identity, booking, notification and gateway start from private additional-location properties without service environment variables.',flush=True)
+        print('PASS: identity, booking, notification, AI and gateway start from private additional-location properties without service environment variables.',flush=True)
         try:
             urllib.request.urlopen('http://127.0.0.1:8081/api/v1/resources',timeout=5)
         except urllib.error.HTTPError as error:
@@ -120,6 +120,6 @@ def main():
             with socket.socket() as probe:
                 if probe.connect_ex(('127.0.0.1',port))==0:
                     raise RuntimeError('Temporary verification port not released.')
-        print('PASS: temporary backend processes stopped; 8081-8083 and 8085 released.',flush=True)
+        print('PASS: temporary backend processes stopped; 8081-8085 released.',flush=True)
 
 if __name__=='__main__':main()

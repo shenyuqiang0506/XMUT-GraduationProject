@@ -31,6 +31,9 @@ def service_env(environment, service, bootstrap=False):
                 'DB_USERNAME','DB_PASSWORD','DB_URL','REDIS_HOST','REDIS_PORT','REDIS_PASSWORD','RABBITMQ_HOST','RABBITMQ_PORT','RABBITMQ_VHOST','RABBITMQ_USERNAME','RABBITMQ_PASSWORD',
                 'SERVICE_CALL_KEY_PATH','LOGIN_PEER_KEY_PATH','NOTIFICATION_DB_URL','NOTIFICATION_DB_USERNAME','NOTIFICATION_DB_PASSWORD']:
         env.pop(key,None)
+    # 模型密钥与 AI 库凭据不能由父 shell 泄露给身份、预约、网关或通知服务。
+    for key in list(env):
+        if key.startswith('AI_'):env.pop(key,None)
     env.update(load_env(private / 'auth.env'))
     env.update({key: source[key] for key in ['NACOS_USERNAME', 'NACOS_PASSWORD']})
     env['NACOS_SERVER_ADDR'] = '127.0.0.1:' + ('8848' if environment == 'dev' else '18848')
@@ -43,6 +46,8 @@ def service_env(environment, service, bootstrap=False):
         env.update(load_env(private / 'backend.env'))
     elif service == 'notification-service':
         env.update(load_env(private / 'notification.env'))
+    elif service == 'ai-service':
+        env.update(load_env(private / 'ai.env'))
     elif service == 'gateway':
         # 网关只领取限流所需的 Redis 凭据，不领取数据库、签名私钥或管理员密码。
         env.update(REDIS_HOST='127.0.0.1', REDIS_PORT='6379' if environment == 'dev' else '16379',
@@ -52,6 +57,7 @@ def service_env(environment, service, bootstrap=False):
     if service in ['identity-service','gateway']:
         env['LOGIN_PEER_KEY_PATH']=str(private/'login-peer.key')
     env['SPRING_PROFILES_ACTIVE'] = environment + ',business' + (',bootstrap-admin' if bootstrap else '')
+    if service=='ai-service' and env.get('AI_PROVIDER')=='openai':env['SPRING_PROFILES_ACTIVE']+=',ai'
     env['SERVER_ADDRESS'] = '127.0.0.1'
     return env
 

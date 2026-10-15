@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-15",
+  "realBackend": true,
+  "realDatabase": "dev MySQL",
+  "model": "local OpenAI-compatible model",
+  "faultInjection": "only designated conversation GET requests return synthetic 503; all writes go to real services",
+  "stats": {
+    "startTime": "2026-10-15T02:19:42.504Z",
+    "duration": 4778.3589999999995,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "checks": [
+    {
+      "name": "真实会话读取失败可降级，新建后列表故障仍将消息保存到新会话",
+      "status": "passed",
+      "durationMs": 1795
+    },
+    {
+      "name": "真实AI方案以2000字符说明提交普通申请并取消，2001字符在发送前拦截",
+      "status": "passed",
+      "durationMs": 2195
+    }
+  ]
+}

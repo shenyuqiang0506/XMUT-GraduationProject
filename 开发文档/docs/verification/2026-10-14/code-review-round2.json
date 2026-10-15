@@ -1,0 +1,146 @@
+{
+  "date": "2026-10-14",
+  "round": 2,
+  "baseCommit": "6c03de2",
+  "sourceCodeModified": false,
+  "existingSourceChangesPreserved": [
+    "gateway/src/main/java/org/shen/gateway/GatewayBusinessConfiguration.java",
+    "gateway/src/main/resources/application.properties"
+  ],
+  "previousFindings": [
+    {
+      "id": "rules-resource-race",
+      "status": "fixed-for-original-trigger",
+      "verification": "current code path and existing regression; real infrastructure smoke not rerun"
+    },
+    {
+      "id": "gateway-shared-login-peer",
+      "status": "fixed-for-original-trigger",
+      "verification": "current code path and existing regression; real infrastructure smoke not rerun"
+    },
+    {
+      "id": "duplicate-occupancy-fragment",
+      "status": "fixed-for-original-trigger",
+      "verification": "current code path and existing regression; real infrastructure smoke not rerun"
+    },
+    {
+      "id": "equipment-type-contract",
+      "status": "fixed-for-original-trigger",
+      "verification": "current code path and existing regression; real infrastructure smoke not rerun"
+    },
+    {
+      "id": "waitlist-fallback-conflict",
+      "status": "fixed-for-original-trigger",
+      "verification": "current code path and existing regression; real infrastructure smoke not rerun"
+    },
+    {
+      "id": "catalog-demo-environment",
+      "status": "fixed-for-original-trigger",
+      "verification": "current code path and existing regression; real infrastructure smoke not rerun"
+    },
+    {
+      "id": "list-response-race",
+      "status": "fixed-for-original-trigger",
+      "verification": "current code path and existing regression; real infrastructure smoke not rerun"
+    },
+    {
+      "id": "refresh-503-session-clear",
+      "status": "fixed-for-original-trigger",
+      "verification": "current code path and existing regression; real infrastructure smoke not rerun"
+    }
+  ],
+  "findings": [
+    {
+      "id": "ai-array-intent-loss",
+      "priority": "P2",
+      "path": "ai-service/src/main/java/org/shen/ai/domain/ConditionNormalizer.java",
+      "line": 43,
+      "evidence": "original normalizer with simulated extraction; feature/equipment additions and partial removal"
+    },
+    {
+      "id": "ai-digital-clock-period",
+      "priority": "P2",
+      "path": "ai-service/src/main/java/org/shen/ai/domain/ConditionNormalizer.java",
+      "line": 134,
+      "evidence": "original time parser: 下午3:00 -> 03:00"
+    },
+    {
+      "id": "ai-half-duration",
+      "priority": "P2",
+      "path": "ai-service/src/main/java/org/shen/ai/domain/ConditionNormalizer.java",
+      "line": 155,
+      "evidence": "original normalizer: 两个半小时 -> 30 minutes"
+    },
+    {
+      "id": "ai-create-target-mismatch",
+      "priority": "P2",
+      "path": "web-admin/src/pages/IntelligentQuery.vue",
+      "line": 55,
+      "evidence": "Chromium mock HTTP: created 2, list503, message target1"
+    },
+    {
+      "id": "ai-read-condition-loss",
+      "priority": "P2",
+      "path": "web-admin/src/pages/IntelligentQuery.vue",
+      "line": 38,
+      "evidence": "Chromium mock HTTP: history503, fallback participants8 -> 20"
+    },
+    {
+      "id": "ai-description-contract",
+      "priority": "P2",
+      "path": "web-admin/src/pages/IntelligentQuery.vue",
+      "line": 160,
+      "evidence": "Chromium submits2001 and original backend DTO validator rejects it"
+    },
+    {
+      "id": "prod-demo-application-waitlist-lists",
+      "priority": "P2",
+      "path": "GraduationProject/src/main/java/org/shen/graduationproject/application/Applications.java",
+      "line": 153,
+      "evidence": "H2 fixture, prod DataModes plus original application and waitlist lists"
+    }
+  ],
+  "verification": {
+    "javaModules": 8,
+    "javaTests": 92,
+    "javaFailures": 0,
+    "javaErrors": 0,
+    "frontendBuild": "passed",
+    "existingFrontendTests": 27,
+    "browserReproductions": 3,
+    "liveBusinessDatabaseModified": false,
+    "paidModelCalled": false,
+    "productionStarted": false,
+    "realRabbitMqFaultSmokeRun": false
+  },
+  "javaEvidence": [
+    "PROOF add-feature: existing PROJECTOR becomes [WHITEBOARD] after 加上白板",
+    "PROOF add-equipment: existing 2 microphones disappear after 再加两台电脑",
+    "PROOF partial-removal: 取消白板 clears PROJECTOR and WHITEBOARD together",
+    "PROOF afternoon-digital: 下午3:00 parses as 03:00",
+    "PROOF mixed-half-duration: 两个半小时 parses as 30 minutes and endAt=2026-10-15T14:30+08:00",
+    "PROOF description-contract: backend rejects 2001 characters, while AI page maxlength is 4000",
+    "PROOF prod-demo-application-list: prod DataModes rejects DEMO, but mine and administrative lists return the DEMO row",
+    "PROOF prod-demo-waitlist-list: prod waitlist list also returns the DEMO row"
+  ],
+  "browserEvidence": [
+    {
+      "finding": "ai-create-list-failure",
+      "createdId": "2",
+      "actualMessageConversation": "1"
+    },
+    {
+      "finding": "ai-history-failure-loss",
+      "oldParticipants": 8,
+      "newParticipants": 20,
+      "oldStart": "14:00",
+      "newStart": ""
+    },
+    {
+      "finding": "ai-description-maxlength",
+      "submittedLength": 2001,
+      "frontendMax": 4000,
+      "backendMax": 2000
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-15",
+  "environment": "dev",
+  "url": "http://127.0.0.1:5173",
+  "processManager": "deployment/scripts/dev-workspace.py",
+  "checks": [
+    {
+      "service": "identity",
+      "port": 8083,
+      "status": 200
+    },
+    {
+      "service": "booking",
+      "port": 8082,
+      "status": 200
+    },
+    {
+      "service": "gateway",
+      "port": 8081,
+      "status": 200
+    },
+    {
+      "service": "notification",
+      "port": 8085,
+      "status": 200
+    },
+    {
+      "service": "ai",
+      "port": 8084,
+      "status": 200
+    },
+    {
+      "service": "web",
+      "port": 5173,
+      "status": 200
+    },
+    {
+      "endpoint": "gateway /api/v1/ai/conversations",
+      "unauthenticatedStatus": 401
+    }
+  ],
+  "productionStarted": false,
+  "modelRequestsSent": false
+}

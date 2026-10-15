@@ -1,0 +1,199 @@
+{
+  "date": "2026-10-14",
+  "recordedAt": "2026-10-14T15:31:48.499978+00:00",
+  "baseline": "6c03de2",
+  "scope": "第二轮复审的7项问题",
+  "promptVersion": "conditions-v2",
+  "findings": [
+    {
+      "id": 1,
+      "status": "FIXED",
+      "summary": "条件数组的追加、局部删除与整体替换"
+    },
+    {
+      "id": 2,
+      "status": "FIXED",
+      "summary": "数字时刻的时段转换"
+    },
+    {
+      "id": 3,
+      "status": "FIXED",
+      "summary": "复合半小时时长"
+    },
+    {
+      "id": 4,
+      "status": "FIXED",
+      "summary": "创建后的会话目标一致性"
+    },
+    {
+      "id": 5,
+      "status": "FIXED",
+      "summary": "历史读取失败保留已确认条件及发送响应版本"
+    },
+    {
+      "id": 6,
+      "status": "FIXED",
+      "summary": "说明长度与后端2000字符一致"
+    },
+    {
+      "id": 7,
+      "status": "FIXED",
+      "summary": "列表总数和分页前隔离DEMO"
+    }
+  ],
+  "java": {
+    "command": "./GraduationProject/mvnw -s .mvn/settings.xml -o -B -ntp test",
+    "exitCode": 0,
+    "total": 107,
+    "modules": [
+      {
+        "module": "common-contracts",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "security-core",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "service-support",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "identity-service",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "notification-service",
+        "tests": 0,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "GraduationProject",
+        "tests": 29,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "ai-service",
+        "tests": 27,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "gateway",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "newTests": 15
+  },
+  "frontend": {
+    "command": "npm run test:frontend",
+    "exitCode": 0,
+    "stats": {
+      "startTime": "2026-10-14T15:26:48.717Z",
+      "duration": 16925.514,
+      "expected": 31,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "newTests": 4
+  },
+  "build": {
+    "command": "npm run build",
+    "exitCode": 0,
+    "checks": [
+      "vue-tsc --noEmit",
+      "tsc --noEmit -p tests/tsconfig.json",
+      "vite build"
+    ],
+    "warning": "既有单个包体积超过500 kB"
+  },
+  "additionalChecks": [
+    "ai-smoke.py AST语法解析",
+    "git diff --check"
+  ],
+  "sources": [
+    {
+      "path": "ai-service/src/main/java/org/shen/ai/domain/ConditionNormalizer.java",
+      "sha256": "d915006dafe0290ac50d6f02786aa4a8cde82467c016d8d0729a83961ef930a8"
+    },
+    {
+      "path": "ai-service/src/main/java/org/shen/ai/infrastructure/ConditionExtractor.java",
+      "sha256": "6b174936c346876879f6bdbb4a2cb306c0d865ee7359d6768f312f1c78c308b9"
+    },
+    {
+      "path": "GraduationProject/src/main/java/org/shen/graduationproject/application/Applications.java",
+      "sha256": "9d14eac84db5b461e67f22d80c58045c479e0937ce392dfb5ba2b303048f59ba"
+    },
+    {
+      "path": "GraduationProject/src/main/java/org/shen/graduationproject/application/Waitlists.java",
+      "sha256": "df418618b1010c4c9921614f0ad440d42a6a1f627835fabd0dcdeda11f12791b"
+    },
+    {
+      "path": "web-admin/src/pages/IntelligentQuery.vue",
+      "sha256": "a4f9ad4e27ff9a45f0837832703afc6494b36a2a871c50045b4af22beebd8036"
+    },
+    {
+      "path": "ai-service/src/test/java/org/shen/ai/domain/ConditionNormalizerTests.java",
+      "sha256": "abfa537e8be6af29236315e1e057992db0573b82ba90202f5077f91a9f994bc6"
+    },
+    {
+      "path": "ai-service/src/test/java/org/shen/ai/infrastructure/ConditionExtractorTests.java",
+      "sha256": "2eaef2e9d403333a9b8714ef41013a6c2a4d29b6d68d733184fc822b29680084"
+    },
+    {
+      "path": "GraduationProject/src/test/java/org/shen/graduationproject/BusinessListModeTests.java",
+      "sha256": "13d8f8049df3e5b787473e131605f182b9893f7ccf9397bc4ef2cd40e419b0c4"
+    },
+    {
+      "path": "web-admin/tests/ai-browser.spec.ts",
+      "sha256": "e8a3f49f0069e5eccee5895a01af3a2997e311a593b226b61fecd53deb832394"
+    },
+    {
+      "path": "deployment/scripts/ai-smoke.py",
+      "sha256": "883e84333a91b32db4a3b7cb7d54ff06b55bcd3cb0ca70159bd38fae456b6e84"
+    }
+  ],
+  "logs": [
+    {
+      "path": "/private/tmp/graduation-round2-fixes-java.log",
+      "sha256": "adac6dd50368be93fb39f263c142b585fde4e42d03ac6513002be036acbaa755"
+    },
+    {
+      "path": "/private/tmp/graduation-round2-fixes-build.log",
+      "sha256": "ed95a28a9b33164ed7b8b2718c367cd97126a2263f9ff2bae812828e045459ca"
+    },
+    {
+      "path": "/private/tmp/graduation-round2-fixes-frontend.log",
+      "sha256": "bb6d3bec0e1411b4ff15b00693a1cb75f38c86733efe246e9961c6e08f48c4f8"
+    }
+  ],
+  "limitations": [
+    "模拟Spring AI响应，无付费模型调用",
+    "模拟HTTP的Chromium测试",
+    "H2内存库，正式列表服务方法及SQL",
+    "未重跑真实MySQL/Redis/消息中间件链路",
+    "未启动prod或重启现有服务",
+    "未修改历史Flyway迁移"
+  ]
+}

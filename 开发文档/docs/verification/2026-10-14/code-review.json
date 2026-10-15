@@ -1,0 +1,109 @@
+{
+  "date": "2026-10-14",
+  "baseCommit": "c5161b7",
+  "sourceCodeModified": false,
+  "existingWorkingTreeChangePreserved": "gateway/src/main/resources/application.properties",
+  "findings": [
+    {
+      "id": "rules-resource-race",
+      "priority": "P1",
+      "path": "web-admin/src/pages/Rules.vue",
+      "line": 81,
+      "evidence": "Chromium mocked HTTP"
+    },
+    {
+      "id": "gateway-shared-login-peer",
+      "priority": "P1",
+      "path": "identity-service/src/main/java/org/shen/identity/controller/AuthController.java",
+      "line": 40,
+      "evidence": "code-path review and isolated peer counter"
+    },
+    {
+      "id": "duplicate-occupancy-fragment",
+      "priority": "P2",
+      "path": "GraduationProject/src/main/java/org/shen/graduationproject/application/TemporalImports.java",
+      "line": 254,
+      "evidence": "H2 isolated unique-constraint reproduction"
+    },
+    {
+      "id": "equipment-type-contract",
+      "priority": "P2",
+      "path": "GraduationProject/src/main/java/org/shen/graduationproject/domain/CatalogCommands.java",
+      "line": 34,
+      "evidence": "Jakarta Validation original DTOs"
+    },
+    {
+      "id": "waitlist-fallback-conflict",
+      "priority": "P2",
+      "path": "GraduationProject/src/main/java/org/shen/graduationproject/application/Waitlists.java",
+      "line": 95,
+      "evidence": "H2 queue plus dependency substitutes"
+    },
+    {
+      "id": "catalog-demo-environment",
+      "priority": "P2",
+      "path": "GraduationProject/src/main/java/org/shen/graduationproject/application/ResourceCatalog.java",
+      "line": 41,
+      "evidence": "original validate method and code-path review; prod not started"
+    },
+    {
+      "id": "list-response-race",
+      "priority": "P2",
+      "path": "web-admin/src/pages/Resources.vue",
+      "line": 48,
+      "evidence": "Chromium mocked HTTP; Users path static review"
+    },
+    {
+      "id": "refresh-503-session-clear",
+      "priority": "P2",
+      "path": "web-admin/src/stores/session.ts",
+      "line": 90,
+      "evidence": "Chromium mocked HTTP"
+    }
+  ],
+  "verification": {
+    "javaModules": 8,
+    "javaTests": 60,
+    "javaFailures": 0,
+    "frontendBuild": "passed",
+    "existingFrontendTests": 16,
+    "browserReproductions": 3,
+    "isolatedJavaChecks": 5,
+    "liveBusinessDatabaseModified": false,
+    "productionStarted": false,
+    "realRabbitMqFaultSmokeRun": false
+  },
+  "isolatedJavaEvidence": [
+    "PROOF equipment-type-mismatch: catalog accepts 话筒, search rejects 话筒",
+    "PROOF catalog-mode-guard: ResourceCatalog.validate accepts DEMO without checking an environment",
+    "PROOF repeated-fragment: valid reactivation followed by same snapshot raises DuplicateKeyException",
+    "PROOF waitlist-fallback: live WAITING group blocks direct booking with WAITLIST_PRIORITY; free resources reject joining with WAITLIST_NOT_NEEDED",
+    "PROOF shared-login-peer: 30 distinct usernames exhaust the gateway peer bucket, fresh user gets 429"
+  ],
+  "browserEvidence": [
+    {
+      "finding": "rules-race",
+      "selectedResource": "2",
+      "displayedResource": "1",
+      "savedResource": "1",
+      "requests": [
+        "/api/v1/admin/resources/2/external-occupancies",
+        "/api/v1/admin/resources/2/external-occupancies",
+        "/api/v1/admin/resources/1/opening-rules"
+      ]
+    },
+    {
+      "finding": "catalog-race",
+      "filter": "B",
+      "displayedResult": "A"
+    },
+    {
+      "finding": "refresh-503-logout",
+      "result": {
+        "status": 503,
+        "code": "SERVICE_UNAVAILABLE"
+      },
+      "route": "/login"
+    }
+  ]
+}

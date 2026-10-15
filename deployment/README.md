@@ -71,7 +71,7 @@ java -jar GraduationProject/target/GraduationProject-0.0.1-SNAPSHOT.jar
 
 ## AI 配置与历史验证
 
-AI 服务保留 Spring AI 依赖、模型配置与身份接入骨架，正式 AI 查询业务待实现。旧演示接口、Basic 认证、`m1` profile、凭据生成器及专用冒烟脚本已于 2026-10-12 移除；不再生成或加载演示账号。
+AI 服务已实现本人会话、条件提取、受控只读查询及方案确认，详见 [M5 智能查询](../开发文档/docs/development/22-M5智能查询.md)。旧演示接口、Basic 认证、`m1` profile、凭据生成器及专用冒烟脚本已于 2026-10-12 移除；不再生成或加载旧演示账号。现行验收显式使用隔离 DEMO 资料，AI 不直接写预约。
 
 已有 `deployment/.env.ai` 继续作为本机私密配置保留，包含 `AI_BASE_URL`、`AI_MODEL`、`AI_API_KEY`，权限 600 且 Git 忽略。不要将真实密钥写入公开文件。历史调用结果保存在 `开发文档/docs/verification/2026-10-11/m1/`，只说明当时通过了技术验证，不是现行操作指令。
 
@@ -119,20 +119,21 @@ python3 deployment/scripts/prepare-messaging.py prod
 
 每套环境生成 RSA 3072 私钥/公钥、`auth.env`、`identity.env`，权限 600。`auth.env` 保存公钥路径、issuer、audience、key ID 与私密导入目录；身份私钥只在 identity 环境中加载。dev 的 `business-accounts.md` 留存初始化账号与原始密码，数据库只保存 BCrypt。prod 没有 dev 初始化账号，首次管理员需在上线前通过受控配置流程建立；本次未启动 prod。
 
-`run-service.py` 分别加载身份库与目录库凭据，启用 `dev,business`。身份首次启动可使用 `--bootstrap-admin`，只允许 dev，已有账号不重置。手工在四个终端启动：
+`run-service.py` 分服务加载独立库凭据，启用 `dev,business`；AI 已配置模型时增加 `ai` profile。身份首次启动可使用 `--bootstrap-admin`，只允许 dev，已有账号不重置。手工在五个终端启动：
 
 ```sh
 python3 deployment/scripts/run-service.py dev identity-service --bootstrap-admin
 python3 deployment/scripts/run-service.py dev booking-service
 python3 deployment/scripts/run-service.py dev notification-service
+python3 deployment/scripts/run-service.py dev ai-service
 python3 deployment/scripts/run-service.py dev gateway
 ```
 
-推荐根目录运行 `python3 deployment/scripts/dev-workspace.py start` 启动四个服务与 Web。它记录 PID、启动时间与所属进程组；`stop` 只停止本脚本创建且身份匹配的进程及同组子进程。端口占用时不接管其他进程，日志与记录保存在 `secrets/dev/`。
+推荐根目录运行 `python3 deployment/scripts/dev-workspace.py start` 启动五个后端服务与 Web。它记录 PID、启动时间与所属进程组；`stop` 只停止本脚本创建且身份匹配的进程及同组子进程。端口占用时不接管其他进程，日志与记录保存在 `secrets/dev/`。
 
-IDEA 调试可先在仓库根目录执行 `python3 deployment/scripts/prepare-idea.py`，然后选 **后端总启动（dev）**。它同时启动 identity、booking、notification、gateway，分服务配置也可独立运行。准备脚本从现有 dev 私密文件生成 `secrets/dev/idea/*.properties`，权限 600；身份签名私钥和初始化管理员凭据只进入身份服务配置。Spring 通过 VM 参数 `spring.config.additional-location` 加载文件；新电脑需先完成上面的基础环境和 `init-auth.py dev`，轮换凭据后需重新生成。共享 `.run` XML 不含密码；当前内层 IDEA 工程的适配 XML 保存在被忽略的 `.idea/runConfigurations/`。此配置仅用于 dev。
+IDEA 调试可先在仓库根目录执行 `python3 deployment/scripts/prepare-idea.py`，然后选 **后端总启动（dev）**。它同时启动 identity、booking、notification、ai、gateway，分服务配置也可独立运行。准备脚本从现有 dev 私密文件生成 `secrets/dev/idea/*.properties`，权限 600；身份签名私钥和初始化管理员凭据只进入身份服务配置。Spring 通过 VM 参数 `spring.config.additional-location` 加载文件；新电脑需先完成上面的基础环境和 `init-auth.py dev`，轮换凭据后需重新生成。共享 `.run` XML 不含密码；当前内层 IDEA 工程的适配 XML 保存在被忽略的 `.idea/runConfigurations/`。此配置仅用于 dev。
 
-可在根目录 Maven `verify` 后运行 `python3 deployment/scripts/verify-idea.py` 验证：清除继承的服务环境变量，以同样的私密 properties 启动四个 JAR，检查 readiness 与网关未认证拒绝。8081–8083、8085 已占用时退出，不接管现有进程；结束后关闭本次启动的进程。日志保存在私密 `secrets/dev/idea-verification/`。不要同时使用 IDEA 和命令行启动器占用同一组端口。
+可在根目录 Maven `verify` 后运行 `python3 deployment/scripts/verify-idea.py` 验证：清除继承的服务环境变量，以同样的私密 properties 启动五个 JAR，检查 readiness 与网关未认证拒绝。8081–8085 已占用时退出，不接管现有进程；结束后关闭本次启动的进程。日志保存在私密 `secrets/dev/idea-verification/`。不要同时使用 IDEA 和命令行启动器占用同一组端口。
 
 2026-10-14 修复内层工程的路径兼容：四个共享配置和内层本机配置统一使用 `$MODULE_WORKING_DIR$` 工作目录，VM 参数为 `-Dspring.config.additional-location="file:../deployment/secrets/dev/idea/<服务名>.properties"`。路径按服务模块内容根定位，避免 `$PROJECT_DIR$` 随打开的 IDEA 工程变化而重复拼接 GraduationProject。[JetBrains 模块目录说明](https://blog.jetbrains.com/idea/2018/05/intellij-idea-2018-1-4-is-released/)。准备脚本现统一重生成四个服务配置；验证脚本读取实际 XML、检查外层/内层上下文解析结果，并从同一工作目录用实际 JVM 参数启动，不再通过另一个硬编码绝对路径绕过配置错误。缺少私密文件时保留失败，不使用 `optional:` 隐藏错误。
 

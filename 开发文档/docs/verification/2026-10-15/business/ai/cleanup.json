@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-15",
+  "scope": "AI smoke fixture namespace ai-<10 hex>, all fixture runs",
+  "remainingRows": {
+    "resources": 0,
+    "applications": 0,
+    "waitlists": 0,
+    "imports": 0,
+    "users": 0,
+    "messages": 0
+  },
+  "pass": true
+}

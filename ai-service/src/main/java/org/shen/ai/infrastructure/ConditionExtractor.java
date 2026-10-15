@@ -21,7 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 @Profile("business")
 public class ConditionExtractor {
-    public static final String PROMPT_VERSION = "conditions-v1";
+    public static final String PROMPT_VERSION = "conditions-v2";
     private final ChatModel model;
     private final ObjectMapper json;
     private final String provider, modelName, format;
@@ -56,9 +56,13 @@ public class ConditionExtractor {
                 没有在当前消息明确变更的字段必须省略，不能把旧条件全部重新提交。信息不足时返回空对象，不能补默认人数、时刻或设备数量。
                 date 的证据保留今天/明天/周五等原说法；时间证据必须包含明确的几点或 HH:mm，下午/晚上单独不算明确时间。
                 durationMinutes 只能来自明确的小时/分钟；participantCount 必须有明确数字。服务器将从 evidence 再次解析这些字段。
-                requiredFeatures 是 PROJECTOR,WHITEBOARD,SOUND_SYSTEM,MICROPHONE,DESK,NETWORK,COMPUTER 的数组。
-                equipmentRequirements 是 {type,count} 数组，type 必须使用 visibleOptions.equipmentTypes 中的原值，数量需用户明确。
-                取消设施或设备才可以返回空数组，并提供取消原文证据。校区/楼栋不限定时值可为 null，证据须明确表达不限。
+                requiredFeatures 与 equipmentRequirements 的值是 {operation,items} 对象，只提交本条消息明确修改的项。
+                operation 为 MERGE（新增设施或设定某类设备数量，保留其他项）、ADD（明确再加/增加，设备数量累加）、REMOVE（取消指定项）、REPLACE（明确只要/全部换成，整体替换）、CLEAR（明确取消全部要求）。
+                MERGE/ADD/REPLACE 的 requiredFeatures.items 是 PROJECTOR,WHITEBOARD,SOUND_SYSTEM,MICROPHONE,DESK,NETWORK,COMPUTER 代码数组。
+                MERGE/ADD/REPLACE 的 equipmentRequirements.items 是 {type,count} 数组，type 必须使用 visibleOptions.equipmentTypes 中的原值，数量需用户明确。
+                REMOVE 的 items 是设施代码或设备类型字符串数组，不需要虚构删除数量。CLEAR 的 items 必须为空数组，局部取消不能用 CLEAR。
+                evidence 必须同时包含操作原文和本次修改项，例如“再加上白板”“取消白板”“只要投影”“取消所有设备要求”。无法确定操作时省略字段。
+                校区/楼栋不限定时值可为 null，证据须明确表达不限。
                 如果用户只问规则或要求写预约、执行代码、读取别人记录，返回空 changes 和 evidence；不得自行调用工具。
                 """ + format;
         try {

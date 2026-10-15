@@ -37,4 +37,15 @@ class ConditionExtractorTests {
         when(model.call(any(Prompt.class))).thenThrow(new IllegalStateException("测试网络失败"));
         assertThatThrownBy(() -> extract(extractor(model,"openai"))).isInstanceOfSatisfying(AiFailure.class,e -> assertThat(e.code()).isEqualTo("AI_MODEL_UNAVAILABLE"));
     }
+    @Test void operationEnvelopeSurvivesModelConversionAndAppliesOnlyTheIncrement() {
+        var model=mock(ChatModel.class);
+        when(model.call(any(Prompt.class))).thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage("""
+            {"changes":{"requiredFeatures":{"operation":"ADD","items":["WHITEBOARD"]}},"evidence":{"requiredFeatures":"再加上白板"}}
+            """)))));
+        var today=LocalDate.of(2026,10,14);var options=Map.<String,Object>of("campuses",List.of(),"equipmentTypes",List.of());
+        var old=Map.<String,Object>of("requiredFeatures",List.of("PROJECTOR"));
+        var patch=extractor(model,"openai").extract("再加上白板",old,List.of(),options,today);
+        var normalized=new ConditionNormalizer().apply(old,patch,"再加上白板",today,options);
+        assertThat(normalized.conditions().get("requiredFeatures")).isEqualTo(List.of("PROJECTOR","WHITEBOARD"));
+    }
 }

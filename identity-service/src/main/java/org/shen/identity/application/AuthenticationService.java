@@ -88,7 +88,8 @@ public class AuthenticationService implements IdentityLookup {
         try {
             // 此读取发生在轮换事务开始之前。失败时明确告知客户端“未执行”，可安全保留原凭据重试。
             candidate = repo.findRefresh(hash);
-        } catch (org.springframework.dao.DataAccessResourceFailureException | org.springframework.dao.TransientDataAccessException unavailable) {
+        } catch (org.springframework.dao.DataAccessResourceFailureException |
+                 org.springframework.dao.TransientDataAccessException unavailable) {
             throw new BusinessException(503, "REFRESH_NOT_EXECUTED", "身份服务暂不可用，刷新尚未执行，请稍后重试");
         }
         if (candidate == null) throw new BusinessException(401, "INVALID_REFRESH_TOKEN", "刷新凭据无效");

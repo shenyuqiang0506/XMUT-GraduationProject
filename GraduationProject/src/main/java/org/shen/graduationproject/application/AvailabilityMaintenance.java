@@ -56,7 +56,7 @@ public class AvailabilityMaintenance {
                         Date.valueOf(rule.validFrom()), Date.valueOf(rule.validTo()), rule.enabled() ? 1 : 0);
             sql.update("UPDATE resource SET version=version+1 WHERE id=?", resource);
             catalog.audit(actor, "OPENING_RULES", "RESOURCE", resource, null, null);
-            coordinator.changed(actor,java.util.List.of(resource));
+            coordinator.changed(actor, java.util.List.of(resource));
             return new CatalogIdempotency.Result(200, Map.of("resourceId", Long.toString(resource), "version", input.expectedVersion() + 1,
                     "rules", queries.openingRules(resource)), false);
         });
@@ -90,7 +90,7 @@ public class AvailabilityMaintenance {
                         resource, input.sourceKey(), Timestamp.from(window.start()), Timestamp.from(window.end()), input.reasonCode(), input.sourceSystem(), row.get("data_mode"));
                 long id = sql.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
                 catalog.audit(actor, "EXTERNAL_CREATE", "RESOURCE", resource, null, "ACTIVE");
-                coordinator.changed(actor,java.util.List.of(resource));
+                coordinator.changed(actor, java.util.List.of(resource));
                 return new CatalogIdempotency.Result(201, view(sql.queryForMap("SELECT * FROM external_occupancy WHERE id=?", id)), false);
             });
         } catch (DuplicateKeyException conflict) {
@@ -135,7 +135,7 @@ public class AvailabilityMaintenance {
             sql.update("UPDATE external_occupancy SET start_at=?,end_at=?,reason_code=?,active=?,observed_at=UTC_TIMESTAMP(3),version=version+1 WHERE id=?",
                     Timestamp.from(window.start()), Timestamp.from(window.end()), input.reasonCode(), input.active() ? 1 : 0, id);
             catalog.audit(actor, "EXTERNAL_UPDATE", "RESOURCE", resource, null, input.active() ? "ACTIVE" : "INACTIVE");
-            coordinator.changed(actor,java.util.List.of(resource));
+            coordinator.changed(actor, java.util.List.of(resource));
             return new CatalogIdempotency.Result(200, view(sql.queryForMap("SELECT * FROM external_occupancy WHERE id=?", id)), false);
         });
     }

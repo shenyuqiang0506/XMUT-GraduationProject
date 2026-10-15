@@ -100,8 +100,8 @@ class AvailabilityController {
     }
 
     @GetMapping("/booking-rules")
-    ApiResponse<?> rules(@AuthenticationPrincipal AuthActor actor,@RequestParam String dataMode) {
-        return ok(policies.publicRules(actor,dataMode));
+    ApiResponse<?> rules(@AuthenticationPrincipal AuthActor actor, @RequestParam String dataMode) {
+        return ok(policies.publicRules(actor, dataMode));
     }
 
     /**

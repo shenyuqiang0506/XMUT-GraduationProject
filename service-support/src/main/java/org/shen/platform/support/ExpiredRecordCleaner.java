@@ -25,7 +25,8 @@ public final class ExpiredRecordCleaner {
         try {
             int removed = remove("DELETE FROM idempotency_record WHERE status='SUCCEEDED' AND expires_at<=UTC_TIMESTAMP(3) ORDER BY expires_at,id LIMIT 500");
             // 历史刷新摘要必须至少保留至会话到期，不能按轮换时间提前删除。
-            if (identity) removed += remove("DELETE FROM used_refresh_token WHERE expires_at<=UTC_TIMESTAMP(3) ORDER BY expires_at,token_hash LIMIT 500");
+            if (identity)
+                removed += remove("DELETE FROM used_refresh_token WHERE expires_at<=UTC_TIMESTAMP(3) ORDER BY expires_at,token_hash LIMIT 500");
             if (removed > 0) log.info("已清理过期技术记录，count={}", removed);
         } catch (RuntimeException failure) {
             // 一次清理失败不阻止后续调度，也不能影响正在处理的业务请求。

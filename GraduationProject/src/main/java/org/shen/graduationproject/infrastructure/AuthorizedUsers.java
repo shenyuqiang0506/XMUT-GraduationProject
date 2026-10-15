@@ -20,8 +20,11 @@ import org.springframework.web.client.RestClientResponseException;
 @Component
 @Profile("business")
 public class AuthorizedUsers {
-    /** 只接收管理员资格校验所需字段，避免未检查的 Map/List 强制转换。 */
-    public record UserSummary(String userId, String status, List<String> roles) {}
+    /**
+     * 只接收管理员资格校验所需字段，避免未检查的 Map/List 强制转换。
+     */
+    public record UserSummary(String userId, String status, List<String> roles) {
+    }
 
     private final IdentityServiceClient http;
 
@@ -34,7 +37,8 @@ public class AuthorizedUsers {
         try {
             var response = http.get("/internal/auth/users/" + id,
                     SecurityContextHolder.getContext().getAuthentication().getCredentials().toString(),
-                    new ParameterizedTypeReference<ApiResponse<UserSummary>>() {});
+                    new ParameterizedTypeReference<ApiResponse<UserSummary>>() {
+                    });
             if (response == null || response.data() == null || !"OK".equals(response.code()) || response.data().roles() == null)
                 throw new BusinessException(503, "SERVICE_UNAVAILABLE", "身份响应无效");
             var roles = response.data().roles();

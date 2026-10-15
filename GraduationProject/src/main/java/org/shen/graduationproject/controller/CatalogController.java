@@ -54,13 +54,13 @@ class CatalogController {
     }
 
     @GetMapping("/resources/options")
-    ApiResponse<?> options(@AuthenticationPrincipal AuthActor actor,@RequestParam String dataMode) {
-        return ok(resources.options(actor,dataMode));
+    ApiResponse<?> options(@AuthenticationPrincipal AuthActor actor, @RequestParam String dataMode) {
+        return ok(resources.options(actor, dataMode));
     }
 
     @PostMapping("/resources/details")
-    ApiResponse<?> details(@AuthenticationPrincipal AuthActor actor,@RequestBody java.util.List<String> resourceIds) {
-        return ok(resources.details(actor,resourceIds));
+    ApiResponse<?> details(@AuthenticationPrincipal AuthActor actor, @RequestBody java.util.List<String> resourceIds) {
+        return ok(resources.details(actor, resourceIds));
     }
 
     /**

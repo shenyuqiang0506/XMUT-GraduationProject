@@ -336,9 +336,9 @@ public class TemporalImports {
                             bound.resource(), source, entry.sourceKey(), Timestamp.from(entry.window().start()), Timestamp.from(entry.window().end()), entry.reason(), id, Timestamp.from(context.captured()), mode);
                 }
             }
-            var preview=new LinkedHashMap<>(json.readValue(current.get("preview_result").toString(),Map.class));
-            preview.put("affectedApplications",coordinator.changed(actor,context.resources()));
-            sql.update("UPDATE import_batch SET status='COMMITTED',committed_at=UTC_TIMESTAMP(3),preview_result=? WHERE id=?",json.writeValueAsString(preview),id);
+            var preview = new LinkedHashMap<>(json.readValue(current.get("preview_result").toString(), Map.class));
+            preview.put("affectedApplications", coordinator.changed(actor, context.resources()));
+            sql.update("UPDATE import_batch SET status='COMMITTED',committed_at=UTC_TIMESTAMP(3),preview_result=? WHERE id=?", json.writeValueAsString(preview), id);
             catalog.audit(actor, "TEMPORAL_COMMIT", "IMPORT_BATCH", id, "PREVIEWED", "COMMITTED");
             return new CatalogIdempotency.Result(200, view(batch(actor, id, false)), false);
         });

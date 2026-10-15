@@ -8,7 +8,9 @@ import java.util.*;
  * 只接收已经通过开放规则、来源覆盖、外部占用校验的设备，不改变可用性判定。
  */
 public final class EquipmentIndex {
-    private record Key(Object group, Object campus, Object type) {}
+    private record Key(Object group, Object campus, Object type) {
+    }
+
     private final Map<Key, List<Map<String, Object>>> grouped = new HashMap<>();
 
     public EquipmentIndex(List<Map<String, Object>> usable) {
@@ -18,7 +20,9 @@ public final class EquipmentIndex {
         }
     }
 
-    /** O(1) 定位候选组，仅提取所需数量；不足时返回空列表，由调用方拒绝该组合。 */
+    /**
+     * O(1) 定位候选组，仅提取所需数量；不足时返回空列表，由调用方拒绝该组合。
+     */
     public List<String> select(Map<String, Object> venue, String type, int count) {
         var candidates = grouped.getOrDefault(new Key(venue.get("approval_group_id"), venue.get("campus"), type), List.of());
         if (candidates.size() < count) return List.of();

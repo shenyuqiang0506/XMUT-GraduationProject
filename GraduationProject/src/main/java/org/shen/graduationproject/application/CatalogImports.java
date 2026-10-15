@@ -221,7 +221,7 @@ public class CatalogImports {
                 var summary = new LinkedHashMap<String, Object>(preview);
                 summary.put("summary", Map.of("sourceRows", parsed.sourceRows(), "newRows", inserted, "updateRows", updated, "errorRows", 0));
                 summary.put("requiresConfirmation", false);
-                summary.put("affectedApplications",coordinator.changed(actor,ids));
+                summary.put("affectedApplications", coordinator.changed(actor, ids));
                 sql.update("UPDATE import_batch SET status='COMMITTED',committed_at=UTC_TIMESTAMP(3),preview_result=? WHERE id=?", json.writeValueAsString(summary), id);
                 catalog.audit(actor, "IMPORT_COMMIT", "IMPORT_BATCH", id, "PREVIEWED", "COMMITTED");
                 return new CatalogIdempotency.Result(200, view(batch(actor, id, false)), false);

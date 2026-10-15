@@ -70,9 +70,11 @@ public class ResourceCatalog {
     /**
      * 显式挑选对外字段，ID 转为字符串。没有查询时间窗口时，已开放资源仍返回 UNKNOWN。
      */
-    public Map<String, Object> view(Map<String, Object> row) {return cache.get(row,() -> freshView(row));}
+    public Map<String, Object> view(Map<String, Object> row) {
+        return cache.get(row, () -> freshView(row));
+    }
 
-    private Map<String,Object> freshView(Map<String,Object> row) {
+    private Map<String, Object> freshView(Map<String, Object> row) {
         var out = new LinkedHashMap<String, Object>();
         String[] columns = {"resource_type", "source_system", "source_id", "name", "campus", "building", "floor_no", "category", "subcategory", "capacity", "exam_capacity", "area", "source_borrowable", "platform_status", "data_mode", "remark", "version"};
         String[] names = {"resourceType", "sourceSystem", "sourceId", "name", "campus", "building", "floorNo", "category", "subcategory", "capacity", "examCapacity", "area", "sourceBorrowable", "platformStatus", "dataMode", "remark", "version"};
@@ -102,22 +104,27 @@ public class ResourceCatalog {
         return result;
     }
 
-    /** 只读工具使用的可见选项，按模式与实时授权范围查询，不能暴露隐藏目录名称。 */
-    public Map<String,Object> options(AuthActor actor,String mode) {
+    /**
+     * 只读工具使用的可见选项，按模式与实时授权范围查询，不能暴露隐藏目录名称。
+     */
+    public Map<String, Object> options(AuthActor actor, String mode) {
         dataModes.check(mode);
-        String where=" WHERE ("+access.visibleSql(actor)+") AND r.data_mode=?";
-        var campuses=sql.queryForList("SELECT DISTINCT r.campus FROM resource r"+where+" AND r.campus IS NOT NULL AND TRIM(r.campus)<>'' ORDER BY r.campus LIMIT 201",String.class,mode);
-        var types=sql.queryForList("SELECT DISTINCT e.equipment_type FROM resource r JOIN equipment_detail e ON e.resource_id=r.id"+where+" ORDER BY e.equipment_type LIMIT 201",String.class,mode);
-        if(campuses.size()>200||types.size()>200)throw new BusinessException(422,"QUERY_TOO_BROAD","目录选项过多，请联系管理员整理类型");
-        return Map.of("campuses",campuses,"equipmentTypes",types,"dataMode",mode);
+        String where = " WHERE (" + access.visibleSql(actor) + ") AND r.data_mode=?";
+        var campuses = sql.queryForList("SELECT DISTINCT r.campus FROM resource r" + where + " AND r.campus IS NOT NULL AND TRIM(r.campus)<>'' ORDER BY r.campus LIMIT 201", String.class, mode);
+        var types = sql.queryForList("SELECT DISTINCT e.equipment_type FROM resource r JOIN equipment_detail e ON e.resource_id=r.id" + where + " ORDER BY e.equipment_type LIMIT 201", String.class, mode);
+        if (campuses.size() > 200 || types.size() > 200)
+            throw new BusinessException(422, "QUERY_TOO_BROAD", "目录选项过多，请联系管理员整理类型");
+        return Map.of("campuses", campuses, "equipmentTypes", types, "dataMode", mode);
     }
 
-    /** 最多读取 128 个已明确选中的资源；每项继续复用详情授权，不提供任意 SQL 或 URL。 */
-    @org.springframework.transaction.annotation.Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
-    public List<Map<String,Object>> details(AuthActor actor,List<String> ids) {
-        if(ids==null||ids.isEmpty()||ids.size()>128||new HashSet<>(ids).size()!=ids.size())
-            throw new BusinessException(400,"VALIDATION_ERROR","详情批量需要 1 至 128 个不同资源编号");
-        return ids.stream().map(CatalogAccess::id).sorted().map(id -> detail(actor,id)).toList();
+    /**
+     * 最多读取 128 个已明确选中的资源；每项继续复用详情授权，不提供任意 SQL 或 URL。
+     */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public List<Map<String, Object>> details(AuthActor actor, List<String> ids) {
+        if (ids == null || ids.isEmpty() || ids.size() > 128 || new HashSet<>(ids).size() != ids.size())
+            throw new BusinessException(400, "VALIDATION_ERROR", "详情批量需要 1 至 128 个不同资源编号");
+        return ids.stream().map(CatalogAccess::id).sorted().map(id -> detail(actor, id)).toList();
     }
 
     /**
@@ -252,7 +259,7 @@ public class ResourceCatalog {
             Map<String, Object> payload = row.get("raw_payload") == null ? Map.of() : json.readValue(row.get("raw_payload").toString(), Map.class);
             update(id, input, row.get("import_batch_id") == null ? null : ((Number) row.get("import_batch_id")).longValue(), payload);
             audit(actor, "UPDATE_RESOURCE", "RESOURCE", id, row.get("platform_status").toString(), input.platformStatus());
-            coordinator.changed(actor,List.of(id));
+            coordinator.changed(actor, List.of(id));
             return new CatalogIdempotency.Result(200, view(raw(id, false)), false);
         });
     }

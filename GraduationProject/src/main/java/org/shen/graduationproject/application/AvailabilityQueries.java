@@ -62,10 +62,10 @@ public class AvailabilityQueries {
     }
 
     private Snapshot load(List<Map<String, Object>> resources, TimeWindow window, Long excludeApplication) {
-        return load(resources,window,excludeApplication,null);
+        return load(resources, window, excludeApplication, null);
     }
 
-    private Snapshot load(List<Map<String, Object>> resources, TimeWindow window, Long excludeApplication,Long excludeWaitlist) {
+    private Snapshot load(List<Map<String, Object>> resources, TimeWindow window, Long excludeApplication, Long excludeWaitlist) {
         if (resources.isEmpty()) return new Snapshot(Map.of(), Map.of(), Map.of());
         Object[] ids = resources.stream().map(AvailabilityQueries::id).toArray();
         String in = placeholders(ids.length);
@@ -182,7 +182,8 @@ public class AvailabilityQueries {
         }
         var evidence = new ArrayList<Map<String, Object>>();
         for (var proof : data.coverage().getOrDefault(resource, List.of())) {
-            if (!mode.equals(proof.get("data_mode")) || !row.get("source_system").equals(proof.get("source_system"))) continue;
+            if (!mode.equals(proof.get("data_mode")) || !row.get("source_system").equals(proof.get("source_system")))
+                continue;
             Instant checked = UtcTimes.instant(proof.get("checked_at"));
             String completeness = policy == null || checked.isAfter(now)
                     || checked.isBefore(now.minusSeconds(policy.settings().coverageFreshnessMinutes() * 60L))
@@ -203,18 +204,20 @@ public class AvailabilityQueries {
      * excludeApplication 只排除正在审批/复核的本申请，不能排除其他用户的占用。
      */
     public List<Map<String, Object>> inspect(List<Long> ids, TimeWindow window, BookingPolicies.Active policy, Long excludeApplication) {
-        return inspect(ids,window,policy,excludeApplication,null);
+        return inspect(ids, window, policy, excludeApplication, null);
     }
 
-    /** 候补确认只排除自己的 offer；其他 OFFERED、申请 HOLD 和已批准占用仍参与冲突检查。 */
-    public List<Map<String,Object>> inspect(List<Long> ids,TimeWindow window,BookingPolicies.Active policy,Long excludeApplication,Long excludeWaitlist) {
+    /**
+     * 候补确认只排除自己的 offer；其他 OFFERED、申请 HOLD 和已批准占用仍参与冲突检查。
+     */
+    public List<Map<String, Object>> inspect(List<Long> ids, TimeWindow window, BookingPolicies.Active policy, Long excludeApplication, Long excludeWaitlist) {
         var rows = sql.queryForList("SELECT r.*,ag.status group_status,e.condition_status,e.equipment_type FROM resource r LEFT JOIN approval_group ag ON ag.id=r.approval_group_id LEFT JOIN equipment_detail e ON e.resource_id=r.id WHERE r.id IN (" + placeholders(ids.size()) + ") ORDER BY r.id", ids.toArray());
         if (rows.size() != ids.size()) throw new BusinessException(404, "NOT_FOUND", "资源不存在或不可见");
-        var data = load(rows, window, excludeApplication,excludeWaitlist);
+        var data = load(rows, window, excludeApplication, excludeWaitlist);
         Instant now = policies.now();
         for (var row : rows) {
             row.put("checked_availability", status(row, window, policy, now, data));
-            row.put("checked_coverage",coverage(row,window,policy,now,data));
+            row.put("checked_coverage", coverage(row, window, policy, now, data));
         }
         return rows;
     }
@@ -272,11 +275,11 @@ public class AvailabilityQueries {
         var index = new EquipmentIndex(usable);
         var plans = matchPlans(venues, requirements, index, window, policy, now, data, input.dataMode());
         // 无匹配时仅汇总当前用户可见候选的原因类别，不返回不可见资源或他人活动信息。
-        var reasons=new TreeSet<String>();
-        if(plans.isEmpty()) {
-            if(venues.isEmpty())reasons.add("NO_MATCHING_CATALOG");
-            for(var venue:venues) {
-                switch(status(venue,window,policy,now,data)) {
+        var reasons = new TreeSet<String>();
+        if (plans.isEmpty()) {
+            if (venues.isEmpty()) reasons.add("NO_MATCHING_CATALOG");
+            for (var venue : venues) {
+                switch (status(venue, window, policy, now, data)) {
                     case "BUSY" -> reasons.add("TIME_OCCUPIED");
                     case "CLOSED" -> reasons.add("OUTSIDE_OPENING_OR_CLOSED");
                     case "UNKNOWN" -> reasons.add("COVERAGE_UNKNOWN");
@@ -288,12 +291,14 @@ public class AvailabilityQueries {
         int offset = Math.min(plans.size(), (input.page() - 1) * input.size());
         // 结果是当前快照，不创建暂占；后续提交联合预约时必须再次锁资源并校验。
         return Map.of("items", plans.subList(offset, Math.min(plans.size(), offset + input.size())), "page", input.page(),
-                "size", input.size(), "total", plans.size(), "checkedAt", TimeWindow.display(now), "reasonCodes",reasons);
+                "size", input.size(), "total", plans.size(), "checkedAt", TimeWindow.display(now), "reasonCodes", reasons);
     }
 
-    /** 组合匹配与 SQL 查询分开，复用设备索引，避免每个场地、每类需求反复扫描全体设备。 */
+    /**
+     * 组合匹配与 SQL 查询分开，复用设备索引，避免每个场地、每类需求反复扫描全体设备。
+     */
     private List<Map<String, Object>> matchPlans(List<Map<String, Object>> venues, List<EquipmentRequirement> requirements,
-            EquipmentIndex index, TimeWindow window, BookingPolicies.Active policy, Instant now, Snapshot data, String mode) {
+                                                 EquipmentIndex index, TimeWindow window, BookingPolicies.Active policy, Instant now, Snapshot data, String mode) {
         var plans = new ArrayList<Map<String, Object>>();
         for (var venue : venues) {
             if (!"AVAILABLE".equals(status(venue, window, policy, now, data))) continue;

@@ -36,7 +36,8 @@ public class AccessTokens {
         var key = new RSAKey.Builder(JwtKeys.publicKey(publicPath)).privateKey(privateKey).keyID(keyId).build();
         try {
             byte[] fingerprintKey = java.nio.file.Files.readAllBytes(java.nio.file.Path.of(fingerprintPath));
-            if (fingerprintKey.length != 32) throw new IllegalStateException("Password fingerprint key must be 32 bytes");
+            if (fingerprintKey.length != 32)
+                throw new IllegalStateException("Password fingerprint key must be 32 bytes");
             this.passwordFingerprintKey = new javax.crypto.spec.SecretKeySpec(fingerprintKey, "HmacSHA256");
             java.util.Arrays.fill(fingerprintKey, (byte) 0);
         } catch (java.io.IOException unavailable) {

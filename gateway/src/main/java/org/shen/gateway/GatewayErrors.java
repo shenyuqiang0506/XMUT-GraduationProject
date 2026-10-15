@@ -11,7 +11,9 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
-/** 网关异常和保护措施沿用统一错误契约；已提交的响应不重复写入。 */
+/**
+ * 网关异常和保护措施沿用统一错误契约；已提交的响应不重复写入。
+ */
 @Component
 @Profile("business")
 @Order(-2)
@@ -19,7 +21,9 @@ import tools.jackson.databind.ObjectMapper;
 final class GatewayErrors implements ErrorWebExceptionHandler {
     private final ObjectMapper json;
 
-    GatewayErrors(ObjectMapper json) { this.json = json; }
+    GatewayErrors(ObjectMapper json) {
+        this.json = json;
+    }
 
     public Mono<Void> handle(ServerWebExchange exchange, Throwable failure) {
         if (exchange.getResponse().isCommitted()) return Mono.error(failure);
@@ -30,8 +34,12 @@ final class GatewayErrors implements ErrorWebExceptionHandler {
         for (int depth = 0; cause != null && depth < 8; depth++, cause = cause.getCause()) {
             if (cause instanceof org.springframework.cloud.gateway.support.NotFoundException || cause instanceof java.net.ConnectException)
                 notConnected = true;
-            if (cause instanceof ResponseStatusException response) { status = response.getStatusCode().value(); break; }
-            if (cause instanceof java.io.IOException || cause instanceof java.util.concurrent.TimeoutException) status = 503;
+            if (cause instanceof ResponseStatusException response) {
+                status = response.getStatusCode().value();
+                break;
+            }
+            if (cause instanceof java.io.IOException || cause instanceof java.util.concurrent.TimeoutException)
+                status = 503;
         }
         String trace = exchange.getResponse().getHeaders().getFirst(TraceIds.HEADER);
         if (status == 500) log.error("网关内部错误，traceId={}", trace, failure);

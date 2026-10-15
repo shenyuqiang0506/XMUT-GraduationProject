@@ -13,13 +13,21 @@ import java.util.HexFormat;
  */
 public final class TokenSecrets {
     private static final SecureRandom RANDOM = new SecureRandom();
-    private TokenSecrets() {}
+
+    private TokenSecrets() {
+    }
+
     public static String refreshToken() {
-        byte[] bytes = new byte[32]; RANDOM.nextBytes(bytes);
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
+
     public static String hash(String value) {
-        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
-        catch (Exception failure) { throw new IllegalStateException("SHA-256 unavailable"); }
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception failure) {
+            throw new IllegalStateException("SHA-256 unavailable");
+        }
     }
 }

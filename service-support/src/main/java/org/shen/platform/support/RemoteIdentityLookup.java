@@ -21,7 +21,8 @@ public final class RemoteIdentityLookup implements IdentityLookup {
     public AuthActor resolve(Jwt jwt) {
         try {
             var response = http.get("/internal/auth/session", jwt.getTokenValue(),
-                    new ParameterizedTypeReference<ApiResponse<AuthActor>>() {});
+                    new ParameterizedTypeReference<ApiResponse<AuthActor>>() {
+                    });
             // 同时核对用户和会话标识，防止成功格式的错误响应被当作当前请求身份。
             if (response == null || !"OK".equals(response.code()) || response.data() == null
                     || !jwt.getSubject().equals(response.data().userId())

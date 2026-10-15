@@ -25,10 +25,13 @@ final class RequestBodyLimitFilter implements WebFilter, Ordered {
 
     RequestBodyLimitFilter(@Value("${GATEWAY_MAX_REQUEST_BYTES:3145728}") long maximum, ObjectMapper json) {
         if (maximum < 1) throw new IllegalArgumentException("请求体大小上限必须为正数");
-        this.maximum = maximum; this.json = json;
+        this.maximum = maximum;
+        this.json = json;
     }
 
-    public int getOrder() { return Ordered.HIGHEST_PRECEDENCE + 1; }
+    public int getOrder() {
+        return Ordered.HIGHEST_PRECEDENCE + 1;
+    }
 
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         if (!exchange.getRequest().getURI().getPath().startsWith("/api/v1/")) return chain.filter(exchange);
@@ -54,6 +57,8 @@ final class RequestBodyLimitFilter implements WebFilter, Ordered {
     }
 
     private static final class TooLarge extends ResponseStatusException {
-        TooLarge() { super(org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE); }
+        TooLarge() {
+            super(org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE);
+        }
     }
 }

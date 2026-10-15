@@ -69,7 +69,8 @@ public class BusinessSecurity {
                     } catch (BusinessException failure) {
                         error(response, json, failure.status(), failure.code(), failure.getMessage());
                         return;
-                    } catch (RestClientException | DataAccessResourceFailureException | TransientDataAccessException unavailable) {
+                    } catch (RestClientException | DataAccessResourceFailureException |
+                             TransientDataAccessException unavailable) {
                         log.warn("身份校验依赖不可用，traceId={}", MDC.get(TraceIds.MDC_KEY), unavailable);
                         error(response, json, 503, "SERVICE_UNAVAILABLE", "身份校验暂不可用");
                         return;

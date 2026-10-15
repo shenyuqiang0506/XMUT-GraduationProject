@@ -25,13 +25,15 @@ class UsersController {
     private final UserAdministration users;
     private final org.shen.identity.infrastructure.IdentityRepository repo;
 
-    /** 后台候补检查使用专用服务签名链，响应只含当前资格，不含会话、密码或个人资料。 */
+    /**
+     * 后台候补检查使用专用服务签名链，响应只含当前资格，不含会话、密码或个人资料。
+     */
     @GetMapping("/internal/booking/applicants/{id}")
     ResponseEntity<?> bookingApplicant(@PathVariable long id) {
-        var user=repo.user(id,false);
-        if(user==null)throw new org.shen.platform.support.BusinessException(404,"NOT_FOUND","账号不存在");
-        return ResponseEntity.ok().header("Cache-Control","no-store").body(ApiResponse.success(
-                java.util.Map.of("userId",Long.toString(id),"status",user.status(),"roles",repo.roles(id)),MDC.get(TraceIds.MDC_KEY)));
+        var user = repo.user(id, false);
+        if (user == null) throw new org.shen.platform.support.BusinessException(404, "NOT_FOUND", "账号不存在");
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(ApiResponse.success(
+                java.util.Map.of("userId", Long.toString(id), "status", user.status(), "roles", repo.roles(id)), MDC.get(TraceIds.MDC_KEY)));
     }
 
     /**

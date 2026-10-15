@@ -2,8 +2,10 @@ package org.shen.identity.domain;
 
 import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
+
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+
 import org.shen.platform.support.BusinessException;
 
 /**
@@ -11,12 +13,15 @@ import org.shen.platform.support.BusinessException;
  * Hutool 只负责字符串处理和格式判断；编号保持原有大小写及前导零。
  */
 public final class PersonnelAccounts {
-    private PersonnelAccounts() { }
+    private PersonnelAccounts() {
+    }
 
-    public record Error(int row, String field, String code, String message) { }
+    public record Error(int row, String field, String code, String message) {
+    }
 
     // errors 用于页面展示；users 含密码，仅在服务端本次请求内使用，禁止直接作为响应返回。
-    public record Prepared(List<AuthCommands.CreateUser> users, List<Error> errors) { }
+    public record Prepared(List<AuthCommands.CreateUser> users, List<Error> errors) {
+    }
 
     public static Prepared prepare(AuthCommands.PersonnelImport input) {
         if (input == null || input.rows() == null || input.rows().isEmpty() || input.rows().size() > 50)

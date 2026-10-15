@@ -8,14 +8,14 @@ import {computed} from 'vue'
  */
 const model = defineModel<string>({default: ''})
 const input = computed({
-    get: () => model.value.replace(' ', 'T'),
-    set: (value: string) => {
-        const text = value.replace('T', ' ')
-        model.value = text.length === 16 ? text + ':00' : text
-    }
+  get: () => model.value.replace(' ', 'T'),
+  set: (value: string) => {
+    const text = value.replace('T', ' ')
+    model.value = text.length === 16 ? text + ':00' : text
+  }
 })
 </script>
 
 <template>
-    <el-input v-model="input" type="datetime-local" step="1" autocomplete="off"/>
+  <el-input v-model="input" type="datetime-local" step="1" autocomplete="off"/>
 </template>

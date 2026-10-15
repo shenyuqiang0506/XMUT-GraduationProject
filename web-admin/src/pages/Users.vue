@@ -12,7 +12,12 @@ const rows = ref<User[]>([]), page = ref(1), total = ref(0), username = ref(''),
     dialog = ref(false), saving = ref(false), keys = mutationKeys(), roleDialog = ref(false),
     target = ref<User | null>(null), roles = ref<Role[]>([])
 const form = ref({username: '', displayName: '', initialPassword: '', roleCodes: ['STUDENT'] as Role[]}),
-    names: Record<Role, string> = {SYSTEM_ADMIN: '系统管理员', RESOURCE_ADMIN: '资源管理员', STUDENT: '学生', TEACHER: '教师'}
+    names: Record<Role, string> = {
+      SYSTEM_ADMIN: '系统管理员',
+      RESOURCE_ADMIN: '资源管理员',
+      STUDENT: '学生',
+      TEACHER: '教师'
+    }
 
 // 学号与工号直接作为登录账号；编号使用文本输入，避免前导零被数字控件丢弃。
 const accountLabel = computed(() => form.value.roleCodes.includes('TEACHER') ? '工号'
@@ -20,7 +25,10 @@ const accountLabel = computed(() => form.value.roleCodes.includes('TEACHER') ? '
 
 // 每次查询都有独立编号；旧请求不能覆盖新筛选，也不能提前撤销新请求的加载遮罩。
 let listRequest = 0
-onBeforeUnmount(() => { listRequest++ })
+onBeforeUnmount(() => {
+  listRequest++
+})
+
 async function load() {
   const request = ++listRequest
   busy.value = true;
@@ -145,7 +153,8 @@ async function changeStatus(row: User) {
   <el-dialog v-model="dialog" title="创建账号" width="500px" @closed="form.initialPassword=''">
     <el-form label-position="top" @submit.prevent="create">
       <el-form-item :label="accountLabel">
-        <el-input v-model="form.username" maxlength="64" autocomplete="off" :placeholder="`请输入${accountLabel}，保留前导零`"/>
+        <el-input v-model="form.username" maxlength="64" autocomplete="off"
+                  :placeholder="`请输入${accountLabel}，保留前导零`"/>
       </el-form-item>
       <el-form-item label="姓名">
         <el-input v-model="form.displayName" maxlength="100"/>

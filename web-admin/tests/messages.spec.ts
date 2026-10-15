@@ -39,7 +39,7 @@ test('教师登记固定组合，等待整组机会后确认并取消新申请',
  await login(page);await page.getByRole('menuitem',{name:'我的候补',exact:true}).click()
  await page.getByRole('button',{name:'登记固定组合候补',exact:true}).click()
  const dialog=page.getByRole('dialog')
- await page.getByLabel('数据模式',{exact:true}).press('ArrowDown');await page.getByRole('option',{name:'演示 DEMO',exact:true}).click()
+ await expect(page.getByLabel('数据模式',{exact:true})).toHaveCount(0)
  await page.getByLabel('候补场地',{exact:true}).click();await page.getByRole('option',{name:required('VENUE'),exact:true}).click()
  await page.getByLabel('配套设备',{exact:true}).press('ArrowDown');await page.getByRole('option',{name:required('EQ1'),exact:true}).click()
  await page.keyboard.press('Escape')

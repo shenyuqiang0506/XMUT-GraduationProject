@@ -96,7 +96,7 @@ export const useSession = defineStore('session', () => {
             } catch (e) {
                 if (version === sessionVersion.value) {
                     if (e instanceof ApiError && [401, 403].includes(e.status)) clear()
-                    // 只有服务明确保证尚未执行轮换，才允许稍后重试；普通 503、超时和坏响应
+                        // 只有服务明确保证尚未执行轮换，才允许稍后重试；普通 503、超时和坏响应
                     // 都可能发生在提交之后。保留界面及错误类型，并暂停后续请求，避免重放撤销会话。
                     else if (!(e instanceof ApiError && e.status === 503 && e.code === 'REFRESH_NOT_EXECUTED'))
                         refreshUncertain.value = true
@@ -118,7 +118,11 @@ export const useSession = defineStore('session', () => {
         try {
             if (token) await fetchResponse('/auth/logout', {
                 method: 'POST',
-                headers: {Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', 'X-Trace-Id': crypto.randomUUID()},
+                headers: {
+                    Authorization: 'Bearer ' + token,
+                    'Content-Type': 'application/json',
+                    'X-Trace-Id': crypto.randomUUID()
+                },
                 body: '{}'
             })
         } catch {
@@ -126,5 +130,18 @@ export const useSession = defineStore('session', () => {
         }
     }
 
-    return {accessToken, sessionVersion, actor, signedIn, refreshUncertain, manager, admin, applicant, login, refresh, logout, clear}
+    return {
+        accessToken,
+        sessionVersion,
+        actor,
+        signedIn,
+        refreshUncertain,
+        manager,
+        admin,
+        applicant,
+        login,
+        refresh,
+        logout,
+        clear
+    }
 })

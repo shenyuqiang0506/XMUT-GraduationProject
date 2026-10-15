@@ -169,6 +169,7 @@ def main():
             record('File type/size/JSON format/import stage and list parameter limits enforced')
             if os.environ.get('XMUT_WEB_TEST')=='1':
                 env=os.environ.copy();env.update(TEST_ADMIN_USERNAME=private['AUTH_ADMIN_USERNAME'],TEST_ADMIN_PASSWORD=private['AUTH_ADMIN_PASSWORD'],TEST_MANAGER_USERNAME=prefix+'_manager',TEST_STUDENT_USERNAME=prefix+'_student',TEST_USER_PASSWORD=password,TEST_PREFIX=prefix,TEST_SOURCE=source,TEST_GROUP=ga)
+                env['VITE_TEST_DATA_MODE']='DEMO'
                 fd=os.open(s.PRIVATE/'web-test.log',os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
                 with os.fdopen(fd,'w') as log:
                     result=subprocess.run(['npm','test','--','tests/business.spec.ts'],cwd=s.REPO/'web-admin',env=env,stdout=log,stderr=subprocess.STDOUT)

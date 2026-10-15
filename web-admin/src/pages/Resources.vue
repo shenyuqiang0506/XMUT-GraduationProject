@@ -3,20 +3,21 @@
  * 资源目录列表、详情、编辑及审批组配置页面。
  * 来源可借用与平台开放分别显示；没有具体时间窗口时，目录状态不能证明资源可预约。
  */
-import {ref, onMounted, onBeforeUnmount} from 'vue'
+import {computed, ref, onMounted, onBeforeUnmount} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
+import {DATA_MODE} from '../api/dataMode'
 import {stringObject} from '../utils/forms'
 import {useSession} from '../stores/session'
 import type {Resource, Group, Page, User} from '../types'
+import AppIcon from '../components/AppIcon.vue'
 
 const session = useSession(), keys = mutationKeys(), rows = ref<Resource[]>([]), total = ref(0), page = ref(1),
     busy = ref(false), error = ref(''), groups = ref<Group[]>([])
-const filters = ref({campus: '', building: '', type: '', dataMode: '', capacityMin: ''}), dialog = ref(false),
+const filters = ref({campus: '', building: '', type: '', capacityMin: ''}), dialog = ref(false),
     editing = ref<Resource | null>(null), saving = ref(false), detail = ref<Resource | null>(null),
     groupDialog = ref(false), groupName = ref(''), membersGroup = ref(''), members = ref<string[]>([]),
     managers = ref<User[]>([])
-// 日常业务默认使用真实来源；测试资料必须显式选择隔离模式。
 const blank = () => ({
   resourceType: 'VENUE',
   sourceSystem: 'MANUAL',
@@ -33,7 +34,7 @@ const blank = () => ({
   sourceBorrowable: 'UNKNOWN',
   platformStatus: 'DRAFT',
   approvalGroupId: null as string | null,
-  dataMode: 'REAL',
+  dataMode: DATA_MODE as Resource['dataMode'],
   remark: '',
   features: {} as Record<string, string>,
   assetCode: '',
@@ -43,17 +44,37 @@ const blank = () => ({
 const form = ref(blank()), featureText = ref('{}')
 const states: Record<string, string> = {DRAFT: '草稿', OPEN: '已开放', CLOSED: '已关闭', RETIRED: '已退役'},
     borrow: Record<string, string> = {YES: '来源可借', NO: '来源不可借', UNKNOWN: '来源未确认'}
+const pageSummary = computed(() => [
+  {label: '匹配资源总数', value: total.value, icon: 'grid', unit: '项'},
+  {label: '本页场地', value: rows.value.filter(r => r.resourceType === 'VENUE').length, icon: 'campus', unit: '处'},
+  {
+    label: '本页设备',
+    value: rows.value.filter(r => r.resourceType === 'EQUIPMENT').length,
+    icon: 'equipment',
+    unit: '件'
+  },
+  {label: '本页已开放', value: rows.value.filter(r => r.platformStatus === 'OPEN').length, icon: 'check', unit: '项'},
+])
+
+function resetFilters() {
+  filters.value = {campus: '', building: '', type: '', capacityMin: ''}
+  page.value = 1
+  load()
+}
 
 // 请求编号区分 A→B→A 的连续查询；仅比较筛选值无法识别第一次 A 的迟到响应。
 let listRequest = 0
-onBeforeUnmount(() => { listRequest++ })
+onBeforeUnmount(() => {
+  listRequest++
+})
+
 // 查询参数在发送前固定，只有最后发起的请求可以更新列表、错误和加载状态。
 async function load() {
   const request = ++listRequest
   busy.value = true;
   error.value = '';
   try {
-    const q = new URLSearchParams({page: String(page.value), size: '20', ...filters.value});
+    const q = new URLSearchParams({page: String(page.value), size: '20', dataMode: DATA_MODE, ...filters.value});
     const data = await api<Page<Resource>>('/resources?' + q);
     if (request !== listRequest) return
     rows.value = data.items;
@@ -75,7 +96,7 @@ onMounted(() => {
   loadGroups().catch(e => error.value = explain(e))
 })
 
-// 编辑时复制记录并补齐表单空值，不直接修改原列表；新增采用真实来源与草稿状态。
+// 编辑时复制记录并补齐表单空值，不直接修改原列表；新增采用草稿状态。
 function open(row?: Resource) {
   editing.value = row || null;
   form.value = row ? {
@@ -171,34 +192,74 @@ async function saveMembers() {
   }
 }
 </script>
-<template><h1>资源目录</h1>
-  <p class="lead">查看场地与设备的来源、容量和管理状态。目录信息不能证明某个时间段可预约。</p>
-  <el-alert title="当前仅提供目录管理，时段可用性与占用覆盖状态尚未验证。" type="info" :closable="false"/>
-  <div class="card">
-    <div class="toolbar">
-      <el-input v-model="filters.campus" placeholder="校区" clearable/>
-      <el-input v-model="filters.building" placeholder="楼栋" clearable/>
-      <el-select v-model="filters.type" placeholder="资源类型" clearable>
-        <el-option label="场地" value="VENUE"/>
-        <el-option label="设备" value="EQUIPMENT"/>
-      </el-select>
-      <el-select v-model="filters.dataMode" placeholder="数据环境" clearable>
-        <el-option label="真实资料 REAL" value="REAL"/>
-        <el-option label="演示资料 DEMO" value="DEMO"/>
-      </el-select>
-      <el-input v-model="filters.capacityMin" placeholder="最小容量" type="number"/>
-      <el-button @click="page=1;load()">查询</el-button>
-      <div class="right">
+<template>
+  <div class="page-heading">
+    <div><span class="eyebrow">发现校园里的好资源</span>
+      <h1>资源目录</h1>
+      <p class="lead">浏览场地与设备，找到适合下一次活动的空间。</p></div>
+    <router-link to="/availability" class="text-action">查找可用时段
+      <AppIcon name="arrow" :size="18"/>
+    </router-link>
+  </div>
+  <section class="catalog-summary" aria-label="资源统计">
+    <div v-for="item in pageSummary" :key="item.label" class="catalog-stat">
+      <span class="stat-icon"><AppIcon :name="item.icon" :size="21"/></span>
+      <div><span>{{ item.label }}</span><strong>{{
+          busy || error ? '—' : item.value.toLocaleString('zh-CN')
+        }}<small>{{ item.unit }}</small></strong></div>
+    </div>
+  </section>
+  <div class="catalog-notice">
+    <AppIcon name="info" :size="18"/>
+    <p>目录展示来源与管理状态，具体时段能否预约，请以可用时段查询及审批结果为准。</p></div>
+  <section class="card catalog-card" aria-labelledby="catalog-title">
+    <div class="section-heading">
+      <div><h2 id="catalog-title">全部资源<span class="count-badge">{{ busy || error ? '—' : total }}</span></h2>
+        <p>按校区、类型或容量筛选资源</p></div>
+      <div class="section-actions">
         <el-button v-if="session.admin" @click="openGroups">审批组</el-button>
-        <el-button v-if="session.manager" type="primary" @click="open()">新增资源</el-button>
+        <el-button v-if="session.manager" type="primary" @click="open()">
+          <AppIcon name="plus" :size="16"/>
+          新增资源
+        </el-button>
       </div>
     </div>
+    <form class="catalog-filters" @submit.prevent="page=1;load()">
+      <label><span>校区</span>
+        <el-input v-model="filters.campus" aria-label="筛选校区" placeholder="校区" clearable/>
+      </label>
+      <label><span>楼栋</span>
+        <el-input v-model="filters.building" aria-label="筛选楼栋" placeholder="楼栋" clearable/>
+      </label>
+      <label><span>资源类型</span>
+        <el-select v-model="filters.type" aria-label="筛选资源类型" placeholder="资源类型" clearable>
+          <el-option label="场地" value="VENUE"/>
+          <el-option label="设备" value="EQUIPMENT"/>
+        </el-select>
+      </label>
+      <label><span>最小容量</span>
+        <el-input v-model="filters.capacityMin" aria-label="筛选最小容量" placeholder="最小容量" type="number" min="0"/>
+      </label>
+      <div class="filter-actions">
+        <el-button type="primary" native-type="submit">
+          <AppIcon name="search" :size="16"/>
+          查询
+        </el-button>
+        <el-button text @click="resetFilters">重置</el-button>
+      </div>
+    </form>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <el-table :data="rows" v-loading="busy">
       <el-table-column label="资源名称" min-width="190">
         <template #default="{row}">
-          <el-button link type="primary" @click="show(row)">{{ row.name }}</el-button>
-          <div class="small">{{ row.sourceSystem }} / {{ row.sourceId }}</div>
+          <div class="resource-name-cell"><span class="resource-type-icon"
+                                                :class="{equipment: row.resourceType === 'EQUIPMENT'}"><AppIcon
+              :name="row.resourceType === 'VENUE' ? 'campus' : 'equipment'"/></span>
+            <div>
+              <el-button link type="primary" @click="show(row)">{{ row.name }}</el-button>
+              <div class="small resource-source">{{ row.sourceSystem }} / {{ row.sourceId }}</div>
+            </div>
+          </div>
         </template>
       </el-table-column>
       <el-table-column label="位置" min-width="160">
@@ -206,18 +267,31 @@ async function saveMembers() {
         </template>
       </el-table-column>
       <el-table-column label="容量" width="90">
-        <template #default="{row}">{{ row.capacity ?? '未知' }}</template>
+        <template #default="{row}"><span class="capacity-value">{{ row.capacity ?? '—' }}</span><span
+            v-if="row.capacity != null" class="capacity-unit">人</span></template>
       </el-table-column>
       <el-table-column label="来源与状态" min-width="155">
         <template #default="{row}">
-          <el-tag :type="row.dataMode==='DEMO'?'warning':'primary'">{{ row.dataMode }}</el-tag>
-          {{ states[row.platformStatus] }}
+          <span class="resource-state"
+                :class="'state-' + row.platformStatus.toLowerCase()"><i/>{{ states[row.platformStatus] }}</span>
           <div class="small">{{ borrow[row.sourceBorrowable] }}</div>
         </template>
       </el-table-column>
       <el-table-column label="时段可用性" width="130">
-        <template #default="{row}">{{ row.availability === 'CLOSED' ? '未开放' : '未知' }}</template>
+        <template #default="{row}"><span class="availability-label">{{
+            row.availability === 'CLOSED' ? '未开放' : '待查询'
+          }}</span></template>
       </el-table-column>
+      <template #empty>
+        <div v-if="!busy" class="empty-state"><span class="empty-state-icon"><AppIcon :name="error ? 'info' : 'search'"
+                                                                                      :size="28"/></span>
+          <strong>{{ error ? '资源暂时未能加载' : '没有找到匹配的资源' }}</strong>
+          <p>{{ error ? '请稍后点击查询重试。' : '试试调整校区、资源类型或容量条件。' }}</p>
+          <el-button v-if="!error" text type="primary" @click="resetFilters">清除筛选条件
+            <AppIcon name="arrow" :size="16"/>
+          </el-button>
+        </div>
+      </template>
       <el-table-column v-if="session.manager" label="操作" width="80">
         <template #default="{row}">
           <el-button link type="primary" @click="open(row)">编辑</el-button>
@@ -226,7 +300,7 @@ async function saveMembers() {
     </el-table>
     <el-pagination v-model:current-page="page" :page-size="20" :total="total" layout="total, prev, pager, next"
                    @current-change="load"/>
-  </div>
+  </section>
   <el-dialog v-model="dialog" :title="editing?'编辑资源':'新增资源'" width="720px" destroy-on-close>
     <el-form label-position="top" @submit.prevent="save">
       <div class="twocol">
@@ -244,12 +318,6 @@ async function saveMembers() {
         </el-form-item>
         <el-form-item label="来源编号（保留前导零）">
           <el-input v-model="form.sourceId" :disabled="!!editing" maxlength="64"/>
-        </el-form-item>
-        <el-form-item label="数据模式">
-          <el-select v-model="form.dataMode" :disabled="!!editing">
-            <el-option label="演示 DEMO" value="DEMO"/>
-            <el-option label="真实 REAL" value="REAL"/>
-          </el-select>
         </el-form-item>
         <el-form-item label="审批组">
           <el-select v-model="form.approvalGroupId" :disabled="!!editing&&!session.admin" clearable
@@ -314,7 +382,6 @@ async function saveMembers() {
         <el-descriptions-item label="位置">{{ detail.campus || '未知' }} / {{ detail.building || '未知' }}
         </el-descriptions-item>
         <el-descriptions-item label="容量">{{ detail.capacity ?? '未知' }}</el-descriptions-item>
-        <el-descriptions-item label="数据">{{ detail.dataMode }}</el-descriptions-item>
         <el-descriptions-item label="平台状态">{{ states[detail.platformStatus] }}</el-descriptions-item>
         <el-descriptions-item label="设施">
           {{ Object.entries(detail.features).map(([k, v]) => k + ': ' + v).join('；') || '未登记' }}

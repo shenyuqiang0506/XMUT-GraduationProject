@@ -231,6 +231,7 @@ def main():
             if os.environ.get('XMUT_WEB_TEST')=='1':
                 commit_batch(admin,'EXTERNAL_OCCUPANCY',[],context(all_ids))
                 env=os.environ.copy()
+                env['VITE_TEST_DATA_MODE']='DEMO'
                 env.update(TEST_ADMIN_USERNAME=private['AUTH_ADMIN_USERNAME'],TEST_ADMIN_PASSWORD=private['AUTH_ADMIN_PASSWORD'],
                            TEST_AVAILABILITY_STUDENT=prefix+'_student',TEST_AVAILABILITY_PASSWORD=passwords['student'],
                            TEST_AVAILABILITY_START=(day+timedelta(hours=10)).strftime('%Y-%m-%d %H:%M:%S'),

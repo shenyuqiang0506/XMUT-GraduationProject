@@ -99,3 +99,98 @@ test('纯管理员不显示 AI 入口，手动切换路由也被角色守卫拦�
     await page.evaluate(async()=>{const path='/src/router/index.ts';await(await import(path)).router.push('/ai')})
     await expect(page).toHaveURL(/\/resources$/);expect(aiRequests).toBe(0)
 })
+
+test('创建成功后列表失败仍切换到新会话，消息不会写入旧会话',async({page})=>{
+    let created=false
+    const sent:string[]=[]
+    const fresh={...conversation,conversationId:'2',conditions:{requiredFeatures:[],equipmentRequirements:[]}}
+    await install(page,async route=>{
+        const path=new URL(route.request().url()).pathname,method=route.request().method()
+        if(path==='/api/v1/ai/conversations'){
+            if(method==='POST'){created=true;await json(route,ok(fresh),201)}
+            else if(created)await json(route,{code:'DEPENDENCY_UNAVAILABLE',message:'会话列表暂不可用'},503)
+            else await json(route,ok({items:[conversation]}))
+            return true
+        }
+        if(/\/ai\/conversations\/[12]\/messages$/.test(path)){
+            if(method==='POST'){sent.push(path);await json(route,ok({status:'NEED_CLARIFICATION'}))}
+            else await json(route,ok({conversation:path.includes('/2/')?fresh:conversation,items:[],latest:path.includes('/2/')?{}:{status:'READY',plans:[plan]}}))
+            return true
+        }
+        return false
+    })
+    await openAi(page);await expect(page.getByTestId('ai-plan')).toBeVisible()
+    await page.getByRole('button',{name:'新建会话',exact:true}).click()
+    await expect(page.getByRole('alert')).toContainText('会话列表暂不可用')
+    await expect(page.getByTestId('ai-conditions')).toContainText('人数：待确认')
+    await expect(page.getByTestId('ai-plan')).toHaveCount(0)
+    await page.getByLabel('查询需求',{exact:true}).fill('新会话六个人')
+    await page.getByRole('button',{name:'发送需求',exact:true}).click()
+    await expect.poll(()=>sent.length).toBe(1);expect(sent).toEqual(['/api/v1/ai/conversations/2/messages'])
+})
+
+test('同一会话读取失败保留条件用于普通查询，同时撤下需要重新核查的方案',async({page})=>{
+    let reads=0
+    await install(page,async route=>{
+        if(!new URL(route.request().url()).pathname.endsWith('/ai/conversations/1/messages'))return false
+        if(++reads===1)await json(route,ok({conversation,items:[{messageId:'1',clientMessageId:'old',text:'八人讨论',reply:'已确认',status:'READY'}],latest:{status:'READY',plans:[plan]}}))
+        else await json(route,{code:'DEPENDENCY_UNAVAILABLE',message:'会话读取暂不可用'},503)
+        return true
+    })
+    await openAi(page);await expect(page.getByTestId('ai-plan')).toBeVisible()
+    await page.getByRole('button',{name:'读取会话结果',exact:true}).click()
+    await expect(page.getByRole('alert')).toContainText('会话读取暂不可用')
+    await expect(page.getByTestId('ai-conditions')).toContainText('人数：8')
+    await expect(page.getByTestId('ai-message')).toContainText('八人讨论')
+    await expect(page.getByTestId('ai-plan')).toHaveCount(0)
+    await page.getByRole('button',{name:'改用普通查询',exact:true}).click()
+    await expect(page.getByLabel('开始时间',{exact:true})).toHaveValue('2026-10-15T14:00')
+    await expect(page.getByLabel('结束时间',{exact:true})).toHaveValue('2026-10-15T16:00')
+    await expect(page.getByLabel('活动人数',{exact:true})).toHaveValue('8')
+})
+
+test('发送成功后的历史读取失败仍保留服务器刚确认的条件和版本',async({page})=>{
+    let reads=0
+    const versions:number[]=[]
+    await install(page,async route=>{
+        if(!new URL(route.request().url()).pathname.endsWith('/ai/conversations/1/messages'))return false
+        if(route.request().method()==='POST'){
+            versions.push(route.request().postDataJSON().expectedConditionVersion)
+            await json(route,ok({status:'NEED_CLARIFICATION',conditions:{...conditions,participantCount:10},conditionVersion:versions.length,plans:[]}))
+        }else if(++reads===1)await json(route,ok({conversation,items:[],latest:{status:'READY',plans:[plan]}}))
+        else await json(route,{code:'DEPENDENCY_UNAVAILABLE',message:'会话读取暂不可用'},503)
+        return true
+    })
+    await openAi(page);await page.getByLabel('查询需求',{exact:true}).fill('人数改成十人')
+    await page.getByRole('button',{name:'发送需求',exact:true}).click()
+    await expect(page.getByRole('alert')).toContainText('会话读取暂不可用')
+    await expect(page.getByTestId('ai-conditions')).toContainText('人数：10');await expect(page.getByTestId('ai-plan')).toHaveCount(0)
+    await page.getByLabel('查询需求',{exact:true}).fill('十个人')
+    await page.getByRole('button',{name:'发送需求',exact:true}).click()
+    await expect.poll(()=>versions.length).toBe(2);expect(versions).toEqual([0,1])
+    await expect(page.getByRole('button',{name:'发送需求',exact:true})).toBeEnabled()
+    await page.getByRole('button',{name:'改用普通查询',exact:true}).click()
+    await expect(page.getByLabel('活动人数',{exact:true})).toHaveValue('10')
+})
+
+test('AI 申请说明限制与后端一致，绕过输入限制的超长说明也不会发送',async({page})=>{
+    const descriptions:string[]=[]
+    await install(page,async route=>{
+        const path=new URL(route.request().url()).pathname
+        if(path.endsWith('/ai/conversations/1/messages')){await json(route,ok({conversation,items:[],latest:{status:'READY',plans:[plan]}}));return true}
+        if(path==='/api/v1/applications'&&route.request().method()==='POST'){
+            descriptions.push(route.request().postDataJSON().description)
+            await json(route,ok({applicationId:'99',status:'PENDING_APPROVAL'}),201);return true
+        }
+        return false
+    })
+    await openAi(page);await page.getByRole('button',{name:'核对并申请此方案',exact:true}).click()
+    const dialog=page.getByRole('dialog',{name:'确认活动申请'}),input=dialog.getByLabel('活动说明',{exact:true})
+    await expect(input).toHaveAttribute('maxlength','2000')
+    await dialog.getByLabel('活动名称',{exact:true}).fill('长度边界活动')
+    await input.evaluate(element=>{(element as HTMLTextAreaElement).value='测'.repeat(2001);element.dispatchEvent(new Event('input',{bubbles:true}))})
+    await dialog.getByRole('button',{name:'确认提交申请',exact:true}).click()
+    await expect(dialog.getByRole('alert')).toContainText('活动说明不能超过 2000 字符');expect(descriptions).toHaveLength(0)
+    await input.fill('测'.repeat(2000));await dialog.getByRole('button',{name:'确认提交申请',exact:true}).click()
+    await expect(page).toHaveURL(/\/applications$/);expect(descriptions.map(value=>value.length)).toEqual([2000])
+})

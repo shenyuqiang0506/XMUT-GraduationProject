@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /**
  * 授权管理员维护开放规则、外部占用及预约策略的页面。
- * 规则与占用沿用资源版本，策略按 REAL/DEMO 独立版本；真实规则不预填制度参数。
+ * 规则与占用沿用资源版本；预约策略统一维护，不预填制度参数。
  */
 import {ref, reactive, onMounted, onBeforeUnmount} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
+import {DATA_MODE} from '../api/dataMode'
 import {useSession} from '../stores/session'
 import {usePagedOptions} from '../composables/usePagedOptions'
 import ShanghaiDateTime from '../components/ShanghaiDateTime.vue'
@@ -52,9 +53,11 @@ const source = ref('MANUAL'), sourceKey = ref<string>(crypto.randomUUID()), star
 const occupancyPage = ref(1), occupancyTotal = ref(0), policyLoading = ref(false)
 const detailLoading = ref(false)
 let resourceRequest = 0, policyRequest = 0
-onBeforeUnmount(() => { resourceRequest++; policyRequest++ })
-// 日常业务默认使用真实来源；测试资料必须显式选择隔离模式。
-const scope = ref('REAL'), policyVersion = ref(0), basis = ref(''),
+onBeforeUnmount(() => {
+  resourceRequest++;
+  policyRequest++
+})
+const policyVersion = ref(0), basis = ref(''),
     settings = reactive<Record<string, number | undefined>>({})
 const fields = [
   {key: 'pendingApprovalTtlMinutes', label: '待审批暂占（分钟）', min: 1, max: 10080},
@@ -68,11 +71,14 @@ const fields = [
 ]
 
 const {items: resources, loading: resourceLoading, hasMore: resourceHasMore, more: loadNextResourcePage} =
-    usePagedOptions<Resource>(page => api<Page<Resource>>('/resources?size=100&page=' + page))
+    usePagedOptions<Resource>(page => api<Page<Resource>>('/resources?dataMode=' + DATA_MODE + '&size=100&page=' + page))
 
 async function loadResources() {
-  try { await loadNextResourcePage() }
-  catch (e) { error.value = explain(e) }
+  try {
+    await loadNextResourcePage()
+  } catch (e) {
+    error.value = explain(e)
+  }
 }
 
 async function more() {
@@ -128,24 +134,24 @@ async function moreOccupancies() {
     occupancies.value.push(...data.items.filter(row => !seen.has(row.id)))
     occupancyPage.value = next
     occupancyTotal.value = data.total
+  } catch (e) {
+    if (request === resourceRequest) error.value = explain(e)
+  } finally {
+    busy.value = false
   }
-  catch (e) { if (request === resourceRequest) error.value = explain(e) }
-  finally { busy.value = false }
 }
 
-// 切换策略范围先清空全部参数；只接受仍属于当前范围的响应，防止异步返回顺序覆盖新选择。
+// 重新加载时先清空参数，只有最新请求可以更新页面。
 async function loadPolicy() {
   const request = ++policyRequest
   error.value = ''
   policyLoading.value = true
-  const requestedScope = scope.value
-  // 切换范围先清除上一套参数；迟到响应不能覆盖当前环境的规则。
   policyVersion.value = 0
   basis.value = ''
   fields.forEach(f => settings[f.key] = undefined)
   try {
-    const p = await api<Policy>('/admin/policies/' + requestedScope)
-    if (request !== policyRequest || scope.value !== requestedScope) return
+    const p = await api<Policy>('/admin/policies/' + DATA_MODE)
+    if (request !== policyRequest) return
     policyVersion.value = p.version
     basis.value = p.basis || ''
     // 参数只能来自已保存的制度配置；未配置时留空，避免把示例数值当成真实规则。
@@ -236,14 +242,13 @@ async function disable(row: Occupancy) {
 // 全部参数和制度依据均需明确填写，创建新版本后重新加载生效策略。
 async function savePolicy() {
   if (busy.value || policyLoading.value) return
-  const selectedScope = scope.value
   busy.value = true;
   error.value = ''
   try {
     if (!basis.value.trim() || fields.some(f => settings[f.key] === undefined)) throw new Error('请填写全部参数和规则依据')
     const payload = {expectedVersion: policyVersion.value, settings: {...settings}, basis: basis.value}
-    await api('/admin/policies/' + selectedScope + '/versions', 'POST', payload, keys.key('policy:' + selectedScope, payload));
-    keys.done('policy:' + selectedScope, payload);
+    await api('/admin/policies/' + DATA_MODE + '/versions', 'POST', payload, keys.key('policy', payload));
+    keys.done('policy', payload);
     await loadPolicy();
     ElMessage.success('新策略版本已启用')
   } catch (e) {
@@ -277,9 +282,10 @@ function display(value: string) {
     <el-form label-position="top">
       <el-form-item label="选择资源">
         <el-select v-model="resourceId" :disabled="busy" filterable @change="loadResource">
-          <el-option v-for="r in resources" :key="r.id" :label="r.name+' · '+r.dataMode" :value="r.id"/>
+          <el-option v-for="r in resources" :key="r.id" :label="r.name" :value="r.id"/>
         </el-select>
-        <el-button v-if="resourceHasMore" :loading="resourceLoading" :disabled="busy" @click="more">加载更多资源</el-button>
+        <el-button v-if="resourceHasMore" :loading="resourceLoading" :disabled="busy" @click="more">加载更多资源
+        </el-button>
       </el-form-item>
     </el-form>
   </div>
@@ -346,35 +352,30 @@ function display(value: string) {
       <el-button native-type="submit" type="primary" :loading="busy">登记外部占用</el-button>
     </el-form>
     <el-table :data="occupancies">
-      <el-table-column prop="sourceSystem" label="来源"/>
-      <el-table-column prop="sourceKey" label="来源编号"/>
-      <el-table-column label="开始">
+      <el-table-column prop="sourceSystem" label="来源" min-width="110"/>
+      <el-table-column prop="sourceKey" label="来源编号" min-width="160"/>
+      <el-table-column label="开始" min-width="165">
         <template #default="{row}">{{ display(row.startAt) }}</template>
       </el-table-column>
-      <el-table-column label="结束">
+      <el-table-column label="结束" min-width="165">
         <template #default="{row}">{{ display(row.endAt) }}</template>
       </el-table-column>
-      <el-table-column label="状态">
+      <el-table-column label="状态" min-width="100">
         <template #default="{row}">{{ row.active ? '有效' : '已停用' }}</template>
       </el-table-column>
-      <el-table-column label="操作">
+      <el-table-column label="操作" min-width="90">
         <template #default="{row}">
           <el-button text :disabled="!row.active||busy" @click="disable(row)">停用</el-button>
         </template>
       </el-table-column>
     </el-table>
-    <el-button v-if="occupancies.length<occupancyTotal" :loading="busy" @click="moreOccupancies">加载更多占用记录</el-button>
+    <el-button v-if="occupancies.length<occupancyTotal" :loading="busy" @click="moreOccupancies">加载更多占用记录
+    </el-button>
   </div>
   <div class="card"><h2>预约策略 · 当前版本 {{ policyVersion }}</h2>
-    <el-alert title="演示数值仅为草案，保存后才启用。真实制度需填写已确认参数及依据；历史版本会保留。" type="info"
+    <el-alert title="请填写已确认的制度参数及依据，保存后启用新版本；历史版本会保留。" type="info"
               :closable="false"/>
     <el-form label-position="top" :disabled="busy||policyLoading" @submit.prevent="savePolicy">
-      <el-form-item label="策略范围">
-        <el-select v-model="scope" :disabled="busy||policyLoading" @change="loadPolicy">
-          <el-option label="演示 DEMO" value="DEMO"/>
-          <el-option label="真实 REAL" value="REAL"/>
-        </el-select>
-      </el-form-item>
       <div class="twocol">
         <el-form-item v-for="f in fields" :key="f.key" :label="f.label">
           <el-input-number v-model="settings[f.key]" :min="f.min" :max="f.max" :precision="0"

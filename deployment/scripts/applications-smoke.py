@@ -321,6 +321,7 @@ def main():
                 env=os.environ.copy();env.update(TEST_APPLICATION_PREFIX=prefix,TEST_APPLICATION_CAMPUS=prefix,
                     TEST_APPLICATION_VENUE=prefix+' 演示 venue',TEST_APPLICATION_START=(day+timedelta(hours=17)).strftime('%Y-%m-%d %H:%M:%S'),
                     TEST_APPLICATION_END=(day+timedelta(hours=18)).strftime('%Y-%m-%d %H:%M:%S'))
+                env['VITE_TEST_DATA_MODE']='DEMO'
                 for name in ['student','teacher','manager']:env.update({('TEST_APPLICATION_'+name).upper():prefix+'_'+name,('TEST_APPLICATION_'+name+'_PASSWORD').upper():passwords[name]})
                 fd=os.open(s.PRIVATE/'applications-web-test.log',os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
                 with os.fdopen(fd,'w') as log:result=subprocess.run(['npm','test','--','tests/applications.spec.ts'],cwd=s.REPO/'web-admin',env=env,stdout=log,stderr=subprocess.STDOUT)

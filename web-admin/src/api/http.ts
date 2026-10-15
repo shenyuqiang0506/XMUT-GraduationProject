@@ -23,8 +23,11 @@ export async function fetchResponse(path: string, init: RequestInit): Promise<Re
 export async function readResponse<T>(response: Response): Promise<T> {
     const trace = response.headers.get('X-Trace-Id') || ''
     let body: unknown
-    try { body = await response.json() }
-    catch { throw new ApiError('服务返回了非预期的响应，请稍后重试', response.status, 'INVALID_RESPONSE', trace) }
+    try {
+        body = await response.json()
+    } catch {
+        throw new ApiError('服务返回了非预期的响应，请稍后重试', response.status, 'INVALID_RESPONSE', trace)
+    }
     if (!body || typeof body !== 'object' || Array.isArray(body))
         throw new ApiError('服务响应格式不正确，请稍后重试', response.status, 'INVALID_RESPONSE', trace)
     const data = body as Record<string, unknown>

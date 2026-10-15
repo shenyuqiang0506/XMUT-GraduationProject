@@ -35,6 +35,70 @@ async function fillDate(page: Page, label: string, value: string) {
     await page.getByLabel(label, {exact: true}).press('Tab')
 }
 
+test('手机导航支持抽屉切换、关闭后恢复焦点，页面不横向溢出', async ({page}) => {
+    await page.setViewportSize({width: 390, height: 844})
+    await install(page, async route => {
+        if (new URL(route.request().url()).pathname !== '/api/v1/admin/applications') return false
+        await json(route, ok({items: [], total: 0, page: 1, size: 20})); return true
+    })
+    await login(page)
+    const toggle = page.getByRole('button', {name: '打开导航菜单'})
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByRole('menuitem', {name: '资源目录', exact: true})).toHaveAttribute('aria-current', 'page')
+    await page.getByRole('menuitem', {name: '预约审批', exact: true}).click()
+    await expect(page.getByRole('heading', {name: '预约审批', exact: true})).toBeVisible()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(toggle).toBeFocused()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await toggle.click()
+    await page.keyboard.press('Escape')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(toggle).toBeFocused()
+})
+
+test('目录统计区分全部匹配和当前页，空结果可重置筛选', async ({page}) => {
+    await install(page, async route => {
+        const url = new URL(route.request().url())
+        if (url.pathname !== '/api/v1/resources') return false
+        const items = url.searchParams.get('campus') ? [] : [resource(1), {...resource(2), platformStatus: 'OPEN'}, {...resource(3), resourceType: 'EQUIPMENT'}]
+        await json(route, ok({items, total: items.length ? 123 : 0, page: 1, size: 20})); return true
+    })
+    await login(page)
+    await expect(page.getByLabel('筛选数据环境', {exact: true})).toHaveCount(0)
+    await expect(page.locator('.mode-tag')).toHaveCount(0)
+    const summary = page.getByRole('region', {name: '资源统计'})
+    await expect(summary.locator('strong')).toHaveText(['123项', '2处', '1件', '1项'])
+    await page.getByPlaceholder('校区', {exact: true}).fill('没有匹配的校区')
+    await page.getByRole('button', {name: '查询', exact: true}).click()
+    await expect(page.getByText('没有找到匹配的资源', {exact: true})).toBeVisible()
+    await page.getByRole('button', {name: '清除筛选条件', exact: true}).click()
+    await expect(page.getByPlaceholder('校区', {exact: true})).toHaveValue('')
+    await expect(summary.locator('strong')).toHaveText(['123项', '2处', '1件', '1项'])
+})
+
+test('普通笔记本高度下管理员末尾菜单可直接看到', async ({page}) => {
+    await page.setViewportSize({width: 1280, height: 720})
+    await install(page)
+    await login(page)
+    await expect(page.getByRole('link', {name: '校园资源预约首页'})).toBeInViewport()
+    await expect(page.getByRole('menuitem', {name: '消息投递管理', exact: true})).toBeInViewport()
+})
+
+test('长表单只滚动内容区，标题和关闭按钮始终可见', async ({page}) => {
+    await page.setViewportSize({width: 390, height: 667})
+    await install(page)
+    await login(page)
+    await page.getByRole('button', {name: '新增资源', exact: true}).click()
+    const dialog = page.getByRole('dialog', {name: '新增资源'})
+    const body = dialog.locator('.el-dialog__body')
+    await expect.poll(() => body.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
+    await dialog.getByRole('button', {name: '保存资源', exact: true}).scrollIntoViewIfNeeded()
+    await expect(dialog.getByRole('heading', {name: '新增资源', exact: true})).toBeInViewport()
+    await expect(dialog.getByRole('button', {name: '关闭此对话框'})).toBeInViewport()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
 test('海外浏览器提交上海时刻，跨上海自然日查询在发送前被拒绝', async ({page}) => {
     const requests: Record<string, unknown>[] = []
     await install(page, async route => {
@@ -44,12 +108,14 @@ test('海外浏览器提交上海时刻，跨上海自然日查询在发送前�
     })
     await login(page)
     await page.getByRole('menuitem', {name: '可用时段查询'}).click()
+    await expect(page.getByLabel('数据模式', {exact: true})).toHaveCount(0)
     await fillDate(page, '开始时间', '2026-10-15 08:00:00')
     await fillDate(page, '结束时间', '2026-10-15 10:00:00')
     await page.getByRole('button', {name: '查询可用组合'}).click()
     await expect.poll(() => requests.length).toBe(1)
     expect(requests[0]?.startAt).toBe('2026-10-15T08:00:00+08:00')
     expect(requests[0]?.endAt).toBe('2026-10-15T10:00:00+08:00')
+    expect(requests[0]?.dataMode).toBe('REAL')
     // 洛杉矶夏令时跳过 02:30，但同一上海时刻必须仍可正确输入。
     await fillDate(page, '开始时间', '2027-03-14 02:30:00')
     await fillDate(page, '结束时间', '2027-03-14 04:00:00')
@@ -100,11 +166,15 @@ for (const [menu, button] of [['可用时段查询', '加载更多场地'], ['�
     })
 }
 
-test('设施和导入 JSON 错误显示中文，并阻止发送写请求', async ({page}) => {
+test('设施和导入 JSON 错误阻止写入，修正后导入统一使用业务模式', async ({page}) => {
     let writes = 0
     await install(page, async route => {
         if (route.request().method() === 'POST' && !new URL(route.request().url()).pathname.startsWith('/api/v1/auth/')) {
-            writes++; await json(route, ok(null)); return true
+            writes++
+            expect(new URL(route.request().url()).pathname).toBe('/api/v1/admin/imports/preview')
+            expect(route.request().postData()).toMatch(/name="dataMode"\r\n\r\nREAL\r\n/)
+            await json(route, ok({batchId: '1', status: 'PREVIEWED', fileHash: 'test-hash',
+                summary: {sourceRows: 0, newRows: 0, updateRows: 0, errorRows: 0}, errors: []})); return true
         }
         return false
     })
@@ -116,22 +186,28 @@ test('设施和导入 JSON 错误显示中文，并阻止发送写请求', async
     await expect(page.getByText('设施配置 JSON 格式不正确', {exact: false})).toBeVisible()
     await dialog.getByRole('button', {name: '关闭此对话框'}).click()
     await page.getByRole('menuitem', {name: '资料导入', exact: true}).click()
+    await expect(page.getByLabel('数据模式', {exact: true})).toHaveCount(0)
     await page.getByTestId('import-file').setInputFiles({name: 'test.json', mimeType: 'application/json', buffer: Buffer.from('[]')})
     await page.getByText('字段映射与来源说明（JSON）', {exact: true}).click()
     await page.getByLabel('字段映射：目标字段 → 原始列名', {exact: true}).fill('null')
     await page.getByRole('button', {name: '预览导入'}).click()
     await expect(page.getByRole('alert').filter({hasText: '字段映射必须是 JSON 对象'})).toBeVisible()
     expect(writes).toBe(0)
+    await page.getByLabel('字段映射：目标字段 → 原始列名', {exact: true}).fill('{}')
+    await page.getByRole('button', {name: '预览导入'}).click()
+    await expect(page.getByTestId('import-preview')).toBeVisible()
+    expect(writes).toBe(1)
 })
 
-test('HTML 网关错误在页面显示中文与追踪号', async ({page}) => {
+test('HTML 网关错误在页面只显示中文说明，不显示请求编号', async ({page}) => {
     await install(page, async route => {
         if (new URL(route.request().url()).pathname !== '/api/v1/resources') return false
         await route.fulfill({status: 502, contentType: 'text/html', headers: {'X-Trace-Id': 'html-gateway-test'}, body: '<html>Bad Gateway</html>'})
         return true
     })
     await login(page)
-    await expect(page.getByRole('alert').filter({hasText: '服务返回了非预期的响应'})).toContainText('html-gateway-test')
+    await expect(page.getByRole('alert').filter({hasText: '服务返回了非预期的响应'}))
+        .toHaveText('服务返回了非预期的响应，请稍后重试')
 })
 
 test('刷新服务故障保持 503 类型，旧请求不会把服务故障改成登录过期', async ({page}) => {
@@ -247,7 +323,7 @@ for (const returnToA of [false, true]) {
         await page.getByRole('menuitem', {name: '开放与占用管理', exact: true}).click()
         const choose = async (id: number) => {
             await page.getByLabel('选择资源', {exact: true}).click()
-            await page.getByRole('option', {name: '测试场地' + id + ' · REAL', exact: true}).click()
+            await page.getByRole('option', {name: '测试场地' + id, exact: true}).click()
         }
         await choose(1)
         await expect.poll(() => !!release).toBe(true)
@@ -369,6 +445,7 @@ test('资源提交断网后重试保持原幂等键，成功后关闭表单', as
     const keys: string[] = []
     await install(page, async route => {
         if (new URL(route.request().url()).pathname !== '/api/v1/admin/resources') return false
+        expect(route.request().postDataJSON().dataMode).toBe('REAL')
         keys.push(route.request().headers()['idempotency-key']!)
         if (keys.length === 1) await route.abort('failed')
         else await json(route, ok(resource(1)), 201)
@@ -377,6 +454,7 @@ test('资源提交断网后重试保持原幂等键，成功后关闭表单', as
     await login(page)
     await page.getByRole('button', {name: '新增资源', exact: true}).click()
     const dialog = page.getByRole('dialog', {name: '新增资源'})
+    await expect(dialog.getByLabel('数据模式', {exact: true})).toHaveCount(0)
     await dialog.getByLabel('资源名称', {exact: true}).fill('临时前端测试')
     await dialog.getByRole('button', {name: '保存资源', exact: true}).click()
     await expect(page.getByText('网络连接失败，请检查连接后重试', {exact: true})).toBeVisible()

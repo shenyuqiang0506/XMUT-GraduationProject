@@ -7,21 +7,23 @@
 import {ref, onMounted, watch} from 'vue'
 import {ElMessage} from 'element-plus'
 import {api, explain, mutationKeys} from '../api/client'
+import {DATA_MODE} from '../api/dataMode'
 import {usePagedOptions} from '../composables/usePagedOptions'
 import ShanghaiDateTime from '../components/ShanghaiDateTime.vue'
 import {shanghaiRange, shanghaiInstant} from '../utils/time'
 import {jsonObject, stringObject} from '../utils/forms'
 import type {ImportBatch, Group, Resource, Page} from '../types'
 
-// 日常业务默认使用真实来源；测试资料必须显式选择隔离模式。
-const file = ref<File | null>(null), source = ref('CAMPUS_CATALOG'), mode = ref('REAL'), group = ref(''),
+const file = ref<File | null>(null), source = ref('CAMPUS_CATALOG'), group = ref(''),
     mapping = ref('{}'), context = ref('{}'), batch = ref<ImportBatch | null>(null), busy = ref(false), error = ref(''),
     groups = ref<Group[]>([]), keys = mutationKeys()
 const kind = ref('RESOURCE_CATALOG'), resourceIds = ref<string[]>([])
 const from = ref(''), to = ref(''), captured = ref('')
 const completeness = ref('PARTIAL'), description = ref('')
 // 预览只对应当时的文件和参数；修改输入后必须重新核对，避免确认旧批次。
-watch([source, mode, group, mapping, context, kind, resourceIds, from, to, captured, completeness, description], () => { batch.value = null }, {deep: true})
+watch([source, group, mapping, context, kind, resourceIds, from, to, captured, completeness, description], () => {
+  batch.value = null
+}, {deep: true})
 onMounted(async () => {
   try {
     groups.value = (await api<{ items: Group[] }>('/admin/approval-groups')).items
@@ -33,14 +35,19 @@ onMounted(async () => {
 
 // 资源选项与文件提交使用独立加载状态，失败不会跳过当前页。
 const {items: resources, loading: resourceLoading, hasMore: resourceHasMore, more: loadNextResourcePage} =
-    usePagedOptions<Resource>(page => api<Page<Resource>>('/resources?size=100&page=' + page))
+    usePagedOptions<Resource>(page => api<Page<Resource>>('/resources?dataMode=' + DATA_MODE + '&size=100&page=' + page))
 
-async function loadResources() { await loadNextResourcePage() }
+async function loadResources() {
+  await loadNextResourcePage()
+}
 
 async function more() {
   error.value = ''
-  try { await loadResources() }
-  catch (e) { error.value = explain(e) }
+  try {
+    await loadResources()
+  } catch (e) {
+    error.value = explain(e)
+  }
 }
 
 // 导入类型或来源条件变化时，同时丢弃旧批次与已选资源范围。
@@ -86,7 +93,7 @@ async function preview() {
       digest,
       filename: file.value.name,
       source: source.value,
-      mode: mode.value,
+      dataMode: DATA_MODE,
       kind: kind.value,
       mappingData,
       contextData
@@ -94,7 +101,7 @@ async function preview() {
     data.set('file', file.value);
     data.set('importType', kind.value);
     data.set('sourceSystem', source.value);
-    data.set('dataMode', mode.value);
+    data.set('dataMode', DATA_MODE);
     data.set('fieldMapping', JSON.stringify(mappingData));
     data.set('queryContext', JSON.stringify(contextData));
     batch.value = await api<ImportBatch>('/admin/imports/preview', 'POST', data, keys.key('preview', payload));
@@ -143,24 +150,19 @@ async function commit() {
         <el-form-item label="来源系统">
           <el-input v-model="source" maxlength="32"/>
         </el-form-item>
-        <el-form-item label="数据模式">
-          <el-select v-model="mode">
-            <el-option label="演示资料 DEMO" value="DEMO"/>
-            <el-option label="真实来源 REAL" value="REAL"/>
-          </el-select>
-        </el-form-item>
         <el-form-item v-if="kind==='RESOURCE_CATALOG'" label="审批组">
           <el-select v-model="group" clearable>
             <el-option v-for="g in groups" :key="g.id" :label="g.name" :value="g.id"/>
           </el-select>
         </el-form-item>
-        <el-form-item label="文件"><input data-testid="import-file" type="file" :disabled="busy" accept=".json,.xlsx,.xls"
+        <el-form-item label="文件"><input data-testid="import-file" type="file" :disabled="busy"
+                                          accept=".json,.xlsx,.xls"
                                           @change="selected"/></el-form-item>
       </div>
       <div v-if="kind!=='RESOURCE_CATALOG'" class="twocol">
         <el-form-item label="明确的资源范围">
           <el-select v-model="resourceIds" multiple filterable>
-            <el-option v-for="r in resources.filter(r=>r.sourceSystem===source&&r.dataMode===mode)" :key="r.id"
+            <el-option v-for="r in resources.filter(r=>r.sourceSystem===source)" :key="r.id"
                        :label="r.name+' · '+r.sourceId" :value="r.id"/>
           </el-select>
           <el-button v-if="resourceHasMore" :loading="resourceLoading" @click="more">加载更多资源</el-button>
@@ -171,7 +173,7 @@ async function commit() {
             <el-option label="已确认完整 COMPLETE" value="COMPLETE"/>
           </el-select>
         </el-form-item>
-        <p class="small">覆盖范围与采集时间均按上海时间（UTC+08:00）填写。</p>
+        <p class="small grid-note">覆盖范围与采集时间均按上海时间（UTC+08:00）填写。</p>
         <el-form-item label="覆盖开始">
           <ShanghaiDateTime v-model="from"/>
         </el-form-item>
@@ -196,7 +198,9 @@ async function commit() {
         </el-collapse-item>
       </el-collapse>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <el-button type="primary" native-type="submit" :loading="busy" :disabled="!file">预览导入</el-button>
+      <div class="form-actions">
+        <el-button type="primary" native-type="submit" :loading="busy" :disabled="!file">预览导入</el-button>
+      </div>
     </el-form>
   </div>
   <div v-if="batch" class="card" data-testid="import-preview"><h2>预览结果 · 批次 {{ batch.batchId }}</h2>

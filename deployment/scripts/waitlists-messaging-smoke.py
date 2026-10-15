@@ -464,6 +464,7 @@ def main():
                     TEST_MESSAGES_VENUE=prefix+' 演示已更新',TEST_MESSAGES_EQ1=prefix+' 演示 eq1',
                     TEST_MESSAGES_START=(day+timedelta(hours=18)).strftime('%Y-%m-%dT%H:%M'),TEST_MESSAGES_END=(day+timedelta(hours=19)).strftime('%Y-%m-%dT%H:%M'),
                     TEST_MESSAGES_STUDENT=prefix+'_student',TEST_MESSAGES_STUDENT_PASSWORD=passwords['student'],TEST_MESSAGES_BLOCKER=web_blocker['applicationId'])
+                env['VITE_TEST_DATA_MODE']='DEMO'
                 fd=os.open(s.PRIVATE/'messages-web-test.log',os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
                 with os.fdopen(fd,'w') as log:result=subprocess.run(['npm','test','--','tests/messages.spec.ts'],cwd=s.REPO/'web-admin',env=env,stdout=log,stderr=subprocess.STDOUT)
                 assert result.returncode==0,'M4 浏览器验收失败，请检查私密 messages-web-test.log'

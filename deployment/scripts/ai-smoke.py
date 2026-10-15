@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import subprocess
 import threading
 import time
 import uuid
@@ -60,7 +61,7 @@ def main():
                 self.send_response(status);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(json.dumps(reply).encode())
             except OSError:pass
     class Mock(ThreadingHTTPServer):daemon_threads=True
-    for port in [MOCK_PORT,AI_PORT,18985]:
+    for port in [MOCK_PORT,AI_PORT,18985,18986]:
         with socket.socket() as probe:
             if probe.connect_ex(('127.0.0.1',port))==0:raise RuntimeError('验收端口被占用，没有停止已有服务。')
     server=Mock(('127.0.0.1',MOCK_PORT),Model);threading.Thread(target=server.serve_forever,daemon=True).start()
@@ -95,7 +96,12 @@ def main():
               'DELETE m FROM ai_message m JOIN ai_conversation c ON c.id=m.conversation_id WHERE c.owner_id IN ('+owned+');'
               'DELETE FROM ai_conversation WHERE owner_id IN ('+owned+');DELETE FROM ai_user_budget WHERE owner_id IN ('+owned+');','ai_db')
         files=s.sql("SELECT file_storage_key FROM import_batch WHERE source_system='"+source+"'").splitlines()
-        s.sql("DELETE FROM outbox_event WHERE delivery_scope='"+audience+"';DELETE FROM audit_log WHERE trace_id LIKE '"+prefix+"%';"
+        groups=s.sql("SELECT DISTINCT g.id FROM waitlist_group g JOIN waitlist_group_resource gr ON gr.group_id=g.id JOIN resource r ON r.id=gr.resource_id WHERE r.source_system='"+source+"'").splitlines()
+        s.sql("DELETE FROM outbox_event WHERE delivery_scope='"+audience+"';DELETE FROM audit_log WHERE trace_id LIKE '"+prefix+"%' OR actor_id IN ("+owned+");"
+              "DELETE o FROM resource_occupancy o JOIN waitlist_entry w ON w.id=o.waitlist_entry_id WHERE w.activity_name LIKE '"+prefix+"%';"
+              "DELETE FROM waitlist_entry WHERE activity_name LIKE '"+prefix+"%';"
+              "DELETE gr FROM waitlist_group_resource gr JOIN resource r ON r.id=gr.resource_id WHERE r.source_system='"+source+"';"
+              "DELETE FROM waitlist_group WHERE id IN ("+(','.join(groups) or '0')+");"
               "DELETE o FROM resource_occupancy o JOIN activity_application a ON a.id=o.application_id WHERE a.activity_name LIKE '"+prefix+"%';"
               "DELETE p FROM approval_record p JOIN activity_application a ON a.id=p.application_id WHERE a.activity_name LIKE '"+prefix+"%';"
               "DELETE r FROM application_resource r JOIN activity_application a ON a.id=r.application_id WHERE a.activity_name LIKE '"+prefix+"%';"
@@ -110,7 +116,7 @@ def main():
               "DELETE FROM import_batch WHERE source_system='"+source+"';"
               "DELETE m FROM approval_group_member m JOIN approval_group g ON g.id=m.group_id WHERE g.name LIKE '"+prefix+"%';"
               "DELETE FROM approval_group WHERE name LIKE '"+prefix+"%';DELETE FROM booking_policy WHERE basis LIKE '"+prefix+"%';"
-              "DELETE FROM idempotency_record WHERE request_key LIKE '"+prefix+"%';")
+              "DELETE FROM idempotency_record WHERE request_key LIKE '"+prefix+"%' OR actor_id IN ("+owned+");")
         for original in previous:s.sql("UPDATE booking_policy p SET active=1 WHERE p.id="+original+" AND NOT EXISTS(SELECT 1 FROM (SELECT scope_code FROM booking_policy WHERE active=1) current_policy WHERE current_policy.scope_code=p.scope_code)")
         for filename in files:
             if filename and '/' not in filename:(storage/filename).unlink(missing_ok=True)
@@ -125,18 +131,18 @@ def main():
                 passwords[name]=uuid.uuid4().hex+'Aa1!';users[name]=expect(call('/users','POST',{'username':prefix+'_'+name,'displayName':'AI DEMO '+name,'initialPassword':passwords[name],'roleCodes':[role]},admin),201)['id']
                 tokens[name]=login(prefix+'_'+name,passwords[name])
             group=expect(call('/admin/approval-groups','POST',{'name':prefix+'-group'},admin),201)['id'];resources={}
-            for name,kind,status in [('venue','VENUE','OPEN'),('unknown','VENUE','OPEN'),('hidden','VENUE','DRAFT'),('eq1','EQUIPMENT','OPEN'),('eq2','EQUIPMENT','OPEN')]:
+            for name,kind,status in [('venue','VENUE','OPEN'),('unknown','VENUE','OPEN'),('hidden','VENUE','DRAFT'),('eq1','EQUIPMENT','OPEN'),('eq2','EQUIPMENT','OPEN'),('pc1','EQUIPMENT','OPEN'),('pc2','EQUIPMENT','OPEN')]:
                 body={'resourceType':kind,'sourceSystem':source,'sourceId':name,'name':prefix+' '+name,'campus':prefix,'capacity':40,'sourceBorrowable':'YES',
                       'platformStatus':status,'approvalGroupId':group,'dataMode':'DEMO','features':{'PROJECTOR':'YES'}}
-                if kind=='EQUIPMENT':body.update(assetCode=prefix+'-'+name,equipmentType='无线 话筒',conditionStatus='GOOD')
+                if kind=='EQUIPMENT':body.update(assetCode=prefix+'-'+name,equipmentType='电脑' if name.startswith('pc') else '无线 话筒',conditionStatus='GOOD')
                 resources[name]=expect(call('/admin/resources','POST',body,admin),201)['id']
             settings={'pendingApprovalTtlMinutes':60,'waitlistOfferTtlMinutes':15,'bookingLeadMinutes':0,'cancelLeadMinutes':0,'maxBookingDaysAhead':30,
-                      'maxDurationMinutes':120,'maxActiveApplicationsPerUser':10,'coverageFreshnessMinutes':120}
+                      'maxDurationMinutes':180,'maxActiveApplicationsPerUser':10,'coverageFreshnessMinutes':120}
             version=int(s.sql("SELECT COALESCE(MAX(policy_version),0) FROM booking_policy WHERE scope_code='DEMO'"))
             expect(call('/admin/policies/DEMO/versions','POST',{'expectedVersion':version,'settings':settings,'basis':prefix+' DEMO AI 规则假设'},admin),201)
             rules=[{'weekday':day.isoweekday(),'startLocal':'08:00:00','endLocal':'20:00:00','validFrom':day.date().isoformat(),'validTo':day.date().isoformat(),'enabled':True}]
             for resource in resources.values():expect(call('/admin/resources/'+resource+'/opening-rules','PUT',{'expectedVersion':0,'rules':rules},admin),200)
-            coverage(admin,[resources[n] for n in ['venue','eq1','eq2']])
+            coverage(admin,[resources[n] for n in ['venue','eq1','eq2','pc1','pc2']])
             assert call('/ai/conversations','POST',{'dataMode':'DEMO'},admin)[0]==403
             key=prefix+'-create';created=expect(call('/ai/conversations','POST',{'dataMode':'DEMO'},tokens['student'],key),201);cid=created['conversationId']
             replay=call('/ai/conversations','POST',{'dataMode':'DEMO'},tokens['student'],key);assert replay[2]['Idempotency-Replayed']=='true' and replay[1]['data']['conversationId']==cid
@@ -147,7 +153,7 @@ def main():
             assert call('/resources/details','POST',[resources['venue'],resources['hidden']],tokens['student'])[0]==404
             record('AI 分库迁移、本人会话、学生教师角色、幂等创建和只读工具权限有效')
             vague='校区为'+prefix+'，明天下午六个人讨论两小时，需要投影'
-            responses[vague]=patch({'campus':prefix,'date':'明天','startLocal':'14:00','participantCount':6,'durationMinutes':120,'requiredFeatures':['PROJECTOR']},
+            responses[vague]=patch({'campus':prefix,'date':'明天','startLocal':'14:00','participantCount':6,'durationMinutes':120,'requiredFeatures':{'operation':'MERGE','items':['PROJECTOR']}},
                 {'campus':prefix,'date':'明天','startLocal':'下午','participantCount':'六个人','durationMinutes':'两小时','requiredFeatures':'投影'})
             msg=prefix+'-first';first=expect(send(cid,vague,0,tokens['student'],msg),200)
             assert first['status']=='NEED_CLARIFICATION' and 'startLocal' in first['missingFields'] and 'startAt' not in first['conditions']
@@ -155,19 +161,61 @@ def main():
             assert send(cid,vague+'改动',0,tokens['student'],msg)[1]['code']=='AI_MESSAGE_ID_REUSED'
             assert s.sql('SELECT requests FROM ai_user_budget WHERE owner_id='+users['student'],'ai_db')=='1'
             record('含糊下午不填默认时刻；重复消息原结果回放、不重复调用模型或计费预算')
-            clear='开始时间14:00';responses[clear]=patch({'startLocal':'14:00'},{'startLocal':'14:00'});readyClient=prefix+'-ready'
+            clear='开始时间下午3:00';responses[clear]=patch({'startLocal':'15:00'},{'startLocal':'下午3:00'});readyClient=prefix+'-ready'
             ready=expect(send(cid,clear,first['conditionVersion'],tokens['student'],readyClient),200)
             assert ready['status']=='READY',(ready.get('errorCode'),ready.get('missingFields'))
-            assert ready['plans'][0]['venueId']==resources['venue'] and ready['conditions']['startAt']==day.date().isoformat()+'T14:00+08:00'
+            assert ready['plans'][0]['venueId']==resources['venue'] and ready['conditions']['startAt']==day.date().isoformat()+'T15:00+08:00'
             assert all(p['venueId']!=resources['unknown'] for p in ready['plans'])
             assert s.sql("SELECT COUNT(*) FROM activity_application WHERE activity_name LIKE '"+prefix+"%'")=='0'
+            responses['再加上白板']=patch({'requiredFeatures':{'operation':'ADD','items':['WHITEBOARD']}},{'requiredFeatures':'再加上白板'})
+            added=expect(send(cid,'再加上白板',ready['conditionVersion'],tokens['student']),200)
+            assert added['conditions']['requiredFeatures']==['PROJECTOR','WHITEBOARD'] and added['status']=='NO_MATCH'
+            responses['取消白板']=patch({'requiredFeatures':{'operation':'REMOVE','items':['WHITEBOARD']}},{'requiredFeatures':'取消白板'})
+            ready=expect(send(cid,'取消白板',added['conditionVersion'],tokens['student']),200)
+            assert ready['conditions']['requiredFeatures']==['PROJECTOR'] and ready['status']=='READY'
+            record('v2 追加白板保留投影、局部取消仅删除白板；下午3:00按15:00落库并查询')
             responses['人数改成八']=patch({'participantCount':8},{'participantCount':'人数改成八'})
             changed=expect(send(cid,'人数改成八',ready['conditionVersion'],tokens['student']),200)
             assert changed['status']=='READY' and changed['conditions']['participantCount']==8 and changed['conditions']['startAt']==ready['conditions']['startAt']
-            responses['需要两个无线话筒']=patch({'equipmentRequirements':[{'type':'无线 话筒','count':2}]},{'equipmentRequirements':'两个无线话筒'})
+            responses['需要两个无线话筒']=patch({'equipmentRequirements':{'operation':'MERGE','items':[{'type':'无线 话筒','count':2}]}},{'equipmentRequirements':'两个无线话筒'})
             equipment=expect(send(cid,'需要两个无线话筒',changed['conditionVersion'],tokens['student']),200)
             assert equipment['status']=='READY' and set(equipment['plans'][0]['equipmentIds'])=={resources['eq1'],resources['eq2']}
+            responses['再加两台电脑']=patch({'equipmentRequirements':{'operation':'ADD','items':[{'type':'电脑','count':2}]}},{'equipmentRequirements':'再加两台电脑'})
+            more=expect(send(cid,'再加两台电脑',equipment['conditionVersion'],tokens['student']),200)
+            assert more['status']=='READY' and len(more['conditions']['equipmentRequirements'])==2
+            assert set(more['plans'][0]['equipmentIds'])=={resources[n] for n in ['eq1','eq2','pc1','pc2']}
+            responses['取消电脑']=patch({'equipmentRequirements':{'operation':'REMOVE','items':['电脑']}},{'equipmentRequirements':'取消电脑'})
+            equipment=expect(send(cid,'取消电脑',more['conditionVersion'],tokens['student']),200)
+            assert equipment['status']=='READY' and equipment['conditions']['equipmentRequirements']==[{'type':'无线 话筒','count':2}]
+            responses['讨论两个半小时']=patch({'durationMinutes':150},{'durationMinutes':'两个半小时'})
+            equipment=expect(send(cid,'讨论两个半小时',equipment['conditionVersion'],tokens['student']),200)
+            assert equipment['status']=='READY' and equipment['conditions']['durationMinutes']==150
+            assert equipment['conditions']['endAt']==day.date().isoformat()+'T17:30+08:00'
+            saved=expect(call('/ai/conversations/'+cid+'/messages',token=tokens['student']),200)
+            assert saved['conversation']['conditions']==equipment['conditions']
+            assert saved['conversation']['version']==equipment['conditionVersion']
+            assert s.sql("SELECT prompt_version FROM ai_message WHERE conversation_id="+cid+" ORDER BY id DESC LIMIT 1",'ai_db')=='conditions-v2'
+            record('追加电脑保留话筒，局部取消设备不丢其他项；两个半小时与v2提示版本持久化并可恢复')
             record('多轮只改明确条件；真实组合和设备名称来自工具，UNKNOWN 场地不进入方案，AI 不写预约')
+            if os.getenv('XMUT_WEB_TEST')=='1':
+                responses['浏览器六人']=patch({'participantCount':6},{'participantCount':'六人'})
+                env=dict(os.environ,TEST_AI_PREFIX=prefix,TEST_AI_USER=prefix+'_student',TEST_AI_PASSWORD=passwords['student'],
+                         TEST_AI_CONVERSATION_ID=cid,TEST_AI_GATEWAY_BASE=BASE,TEST_AI_DATE=day.date().isoformat())
+                env['VITE_TEST_DATA_MODE']='DEMO'
+                # 浏览器日志仅落私密目录；凭据通过环境传递，不进入参数、截图或公开报告。
+                log_path=s.PRIVATE/'ai-test-logs/browser.log'
+                fd=os.open(log_path,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
+                with os.fdopen(fd,'w') as log:
+                    browser=subprocess.run(['npm','test','--','tests/ai-live.spec.ts'],cwd=s.REPO/'web-admin',env=env,stdout=log,stderr=subprocess.STDOUT)
+                if browser.returncode:raise RuntimeError('AI 真实浏览器验收失败，详见私密 browser.log')
+                stats=json.loads((s.REPO/'web-admin/test-results/results.json').read_text())['stats']
+                assert stats['expected']==2 and not stats['unexpected'] and not stats['skipped']
+                record('真实浏览器验证读取故障保留条件、新建后列表故障不串会话、2000字符整组提交并取消')
+            responses['不用再加网络']=patch({'requiredFeatures':{'operation':'ADD','items':['NETWORK']}},{'requiredFeatures':'不用再加网络'})
+            negated=expect(send(cid,'不用再加网络',equipment['conditionVersion'],tokens['student']),200)
+            assert negated['errorCode']=='AI_UNGROUNDED_CONDITION' and negated['conditions']==equipment['conditions']
+            equipment=negated
+            record('模型错误标记否定追加时服务器拒绝修改，保留全部旧条件')
             responses['注入资源']=patch({'resourceIds':[resources['hidden']]},{'resourceIds':'注入资源'})
             rejected=expect(send(cid,'注入资源',equipment['conditionVersion'],tokens['student']),200)
             assert rejected['status']=='FAILED' and rejected['errorCode']=='AI_INVALID_OUTPUT' and not rejected['plans']
@@ -188,11 +236,11 @@ def main():
             record('模型超时有界；单会话并发拒绝、同消息在途不会重复调用，失败结果可回放')
             interrupted=create(tokens['other'])['conversationId'];claim=str(uuid.uuid4());message=prefix+'-orphan'
             s.sql(f"UPDATE ai_conversation SET processing_token='{claim}',processing_until=UTC_TIMESTAMP(3)-INTERVAL 1 SECOND WHERE id={interrupted};"
-                  f"INSERT INTO ai_message(conversation_id,client_message_id,request_hash,content,base_version,status,claim_token,prompt_version,model_name,trace_id,accepted_conditions) VALUES ({interrupted},'{message}',REPEAT('a',64),'中断现场',0,'PROCESSING','{claim}','conditions-v1','mock','{prefix}-request',JSON_OBJECT('participantCount',9));",'ai_db')
+                  f"INSERT INTO ai_message(conversation_id,client_message_id,request_hash,content,base_version,status,claim_token,prompt_version,model_name,trace_id,accepted_conditions) VALUES ({interrupted},'{message}',REPEAT('a',64),'中断现场',0,'PROCESSING','{claim}','conditions-v2','mock','{prefix}-request',JSON_OBJECT('participantCount',9));",'ai_db')
             recovered=expect(call('/ai/conversations/'+interrupted+'/messages',token=tokens['other']),200)
             assert recovered['latest']['errorCode']=='AI_PROCESSING_EXPIRED' and recovered['conversation']['conditions']['participantCount']==9 and recovered['conversation']['version']==1
             record('过期处理租约按请求恢复，检查点保留已确认条件，不重放可能已收费的模型调用')
-            plan=equipment['plans'][0]
+            plan=saved['latest']['plans'][0]
             occupied=expect(call('/admin/resources/'+resources['venue']+'/external-occupancies','POST',{'sourceSystem':'MANUAL','sourceKey':prefix+'-conflict',
                 'startAt':plan['startAt'],'endAt':plan['endAt'],'reasonCode':'EXAM'},admin),201)
             responses['换一间']=patch({},{})
@@ -202,10 +250,30 @@ def main():
             ordinary={'activityName':prefix+' 用户确认','description':'AI 只读方案确认回归','venueId':plan['venueId'],'equipmentIds':plan['equipmentIds'],
                       'startAt':plan['startAt'],'endAt':plan['endAt'],'participantCount':plan['participantCount'],'requiredFeatures':plan['requiredFeatures']}
             assert call('/applications','POST',ordinary,tokens['student'])[1]['code']=='RESOURCE_CONFLICT'
+            waiting=expect(call('/waitlists','POST',dict(ordinary,activityName=prefix+' 候补模式验证'),tokens['student']),201)
+            expect(call('/waitlists/'+waiting['waitlistId']+'/cancel','POST',{'expectedVersion':0,'reason':'DEMO模式验证清理'},tokens['student']),200)
             expect(call('/admin/external-occupancies/'+occupied['id'],'PATCH',{'expectedVersion':0,'active':False,'startAt':plan['startAt'],'endAt':plan['endAt'],'reasonCode':'EXAM'},admin),200)
+            assert call('/applications','POST',dict(ordinary,description='测'*2001),tokens['student'])[0]==400
+            ordinary['description']='测'*2000
             application=expect(call('/applications','POST',ordinary,tokens['student']),201);assert application['status']=='PENDING_APPROVAL'
+            assert len(expect(call('/applications/'+application['applicationId'],token=tokens['student']),200)['description'])==2000
             expect(call('/applications/'+application['applicationId']+'/cancel','POST',{'expectedVersion':0,'reason':'DEMO 清理'},tokens['student']),200)
             record('AI 查询后新增占用仍阻止普通申请；资源恢复后整组提交并等待审批')
+            assert expect(call('/applications?size=1',token=tokens['student']),200)['total']==(2 if os.getenv('XMUT_WEB_TEST')=='1' else 1)
+            assert expect(call('/waitlists?size=1',token=tokens['student']),200)['total']==1
+            # 同一 dev 凭据与库，暂不启用 dev/test profile，执行正式 DataModes 的禁止 DEMO 分支；不启动 prod。
+            restricted='http://127.0.0.1:18986'
+            stack.start('booking-service',18986,{'SPRING_PROFILES_ACTIVE':'business,nacos','SPRING_CLOUD_NACOS_DISCOVERY_REGISTER_ENABLED':'false'})
+            stack.ready_ai(18986)
+            for path in ['/applications?size=1','/applications?page=2&size=1','/waitlists?size=1','/waitlists?page=2&size=1']:
+                listed=expect(call(path,token=tokens['student'],base=restricted),200)
+                assert listed['total']==0 and listed['items']==[]
+            administrative=expect(call('/admin/applications?size=1',token=admin,base=restricted),200)
+            assert administrative['total']==int(s.sql("SELECT COUNT(*) FROM activity_application WHERE data_mode='REAL'"))
+            assert all(item['dataMode']=='REAL' for item in administrative['items'])
+            assert call('/applications/'+application['applicationId'],token=tokens['student'],base=restricted)[0]==403
+            assert call('/waitlists/'+waiting['waitlistId'],token=tokens['student'],base=restricted)[0]==403
+            record('真实MySQL申请和候补列表在统计分页前排除DEMO，管理列表与详情权限一致；未启动prod')
             lowbase='http://127.0.0.1:18985';stack.start('ai-service',18985,{'AI_HOURLY_LIMIT':'2','SPRING_CLOUD_NACOS_DISCOVERY_REGISTER_ENABLED':'false'})
             stack.ready_ai(18985);low=create(tokens['other'],lowbase)['conversationId']
             responses['六人']=patch({'participantCount':6},{'participantCount':'六人'})
@@ -240,13 +308,13 @@ def main():
                 result=expect(send(actual,question,0,tokens['teacher'],base=lowbase),200)
                 samples.append({'input':question,'manualExpected':{'status':'READY','participantCount':6,'date':day.date().isoformat(),'startLocal':'14:00','durationMinutes':120},
                     'actualStatus':result.get('status'),'conditions':result.get('conditions'),'planCount':len(result.get('plans',[])),
-                    'errorCode':result.get('errorCode'),'elapsedMs':round((time.monotonic()-started)*1000),'dataMode':'DEMO','model':real['AI_MODEL'],'promptVersion':'conditions-v1'})
+                    'errorCode':result.get('errorCode'),'elapsedMs':round((time.monotonic()-started)*1000),'dataMode':'DEMO','model':real['AI_MODEL'],'promptVersion':'conditions-v2'})
                 assert result['status']=='READY',(result.get('status'),result.get('errorCode'),result.get('missingFields'))
                 original=result['conditions'];started=time.monotonic()
                 result=expect(send(actual,'人数改成八',result['conditionVersion'],tokens['teacher'],base=lowbase),200)
                 samples.append({'input':'人数改成八','manualExpected':{'status':'READY','participantCount':8,'otherConditionsUnchanged':True},
                     'actualStatus':result.get('status'),'conditions':result.get('conditions'),'planCount':len(result.get('plans',[])),
-                    'errorCode':result.get('errorCode'),'elapsedMs':round((time.monotonic()-started)*1000),'dataMode':'DEMO','model':real['AI_MODEL'],'promptVersion':'conditions-v1'})
+                    'errorCode':result.get('errorCode'),'elapsedMs':round((time.monotonic()-started)*1000),'dataMode':'DEMO','model':real['AI_MODEL'],'promptVersion':'conditions-v2'})
                 assert result['status']=='READY' and result['conditions']['participantCount']==8
                 assert all(result['conditions'].get(k)==v for k,v in original.items() if k!='participantCount')
                 record('真实 DeepSeek 经正式会话和只读工具生成方案，多轮改人数保留时间和设施')

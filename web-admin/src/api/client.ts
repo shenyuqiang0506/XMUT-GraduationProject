@@ -1,6 +1,7 @@
 /** 正式业务 API 入口：访问令牌、追踪编号、幂等键及一次刷新重试。 */
 import {useSession} from '../stores/session'
 import {ApiError, fetchResponse, readResponse} from './http'
+
 export {ApiError} from './http'
 
 export async function api<T>(path: string, method = 'GET', body?: unknown, key?: string, timeoutMs = 15000): Promise<T> {
@@ -52,6 +53,6 @@ export function mutationKeys() {
 }
 
 export function explain(error: unknown) {
-    return error instanceof ApiError ? `${error.message}${error.traceId ? '（请求编号 ' + error.traceId + '）' : ''}`
-        : error instanceof Error ? error.message : '请求失败，请稍后重试'
+    // 追踪编号保留在 ApiError 中供排查，界面只显示可读的错误说明。
+    return error instanceof Error ? error.message : '请求失败，请稍后重试'
 }

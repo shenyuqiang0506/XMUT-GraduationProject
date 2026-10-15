@@ -22,18 +22,22 @@ export const router = createRouter({
     routes: [{path: '/login', component: Login}, {path: '/', redirect: '/resources'}, {
         path: '/resources',
         component: Resources
-    }, {path: '/availability', component: Availability}, {path:'/ai',component:IntelligentQuery,meta:{applicant:true}}, {path:'/applications',component:Applications},
-        {path:'/waitlists',component:Waitlists}, {path:'/notifications',component:Notifications},
-        {path:'/event-delivery',component:EventDelivery,meta:{admin:true}},
-        {path:'/approvals',component:Approvals,meta:{manager:true}}, {
-        path: '/rules',
-        component: Rules,
-        meta: {manager: true}
-    }, {path: '/imports', component: Imports, meta: {manager: true}}, {
-        path: '/users',
-        component: Users,
-        meta: {admin: true}
-    }, {path: '/:pathMatch(.*)*', redirect: '/resources'}]
+    }, {path: '/availability', component: Availability}, {
+        path: '/ai',
+        component: IntelligentQuery,
+        meta: {applicant: true}
+    }, {path: '/applications', component: Applications},
+        {path: '/waitlists', component: Waitlists}, {path: '/notifications', component: Notifications},
+        {path: '/event-delivery', component: EventDelivery, meta: {admin: true}},
+        {path: '/approvals', component: Approvals, meta: {manager: true}}, {
+            path: '/rules',
+            component: Rules,
+            meta: {manager: true}
+        }, {path: '/imports', component: Imports, meta: {manager: true}}, {
+            path: '/users',
+            component: Users,
+            meta: {admin: true}
+        }, {path: '/:pathMatch(.*)*', redirect: '/resources'}]
 })
 // 先检查登录状态，再检查管理员权限；不允许通过手工输入地址绕过页面导航限制。
 router.beforeEach(to => {

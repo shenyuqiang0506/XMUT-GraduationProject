@@ -19,8 +19,7 @@ async function logout(page:Page){
 test.afterEach(async({page})=>{await logout(page)})
 async function submit(page:Page,name:string){
  await page.getByRole('menuitem',{name:'可用时段查询'}).click()
- await page.getByLabel('数据模式',{exact:true}).press('ArrowDown')
- await page.getByRole('option',{name:'演示 DEMO',exact:true}).click()
+ await expect(page.getByLabel('数据模式',{exact:true})).toHaveCount(0)
  for(const [label,field] of [['开始时间','START'],['结束时间','END']]){
    const input=page.getByLabel(label!,{exact:true})
    await input.fill(required('TEST_APPLICATION_'+field).replace(' ','T').replace(/:00$/,''));await input.press('Tab')
